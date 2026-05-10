@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AegisHarness Test UI</title>
+<style>
+body{font:14px system-ui,sans-serif;max-width:900px;margin:24px auto;padding:0 16px}
+textarea,input,button{width:100%;box-sizing:border-box;margin:6px 0;padding:10px}
+button{cursor:pointer}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+pre{white-space:pre-wrap;word-break:break-word;background:#111;color:#eee;padding:12px;min-height:120px}
+</style>
+<h1>AegisHarness Test UI</h1>
+<label>Prompt</label>
+<textarea id="prompt" rows="5">写一个 FastAPI hello world</textarea>
+<button id="create">创建任务</button>
+<div class="row">
+  <div>
+    <label>Task ID</label>
+    <input id="taskId" placeholder="创建后自动填充">
+  </div>
+  <div>
+    <label>Edited Prompt</label>
+    <input id="editedPrompt" placeholder="可选，审批时覆盖结构化 prompt">
+  </div>
+</div>
+<div class="row">
+  <button id="refresh">刷新任务</button>
+  <button id="approve">批准并继续</button>
+</div>
+<button id="reject">拒绝任务</button>
+<h3>Task</h3>
+<pre id="task"></pre>
+<h3>Logs</h3>
+<pre id="logs"></pre>
+<script>
+const $=id=>document.getElementById(id)
+let ws
+const api=location.origin
+const show=(id,v)=>$(id).textContent=typeof v==="string"?v:JSON.stringify(v,null,2)
+const log=t=>$("logs").textContent+=`${new Date().toLocaleTimeString()} ${t}\n`
+function connect(id){
+  if(ws)ws.close()
+  if(!id)return
+  const proto=location.protocol==="https:"?"wss":"ws"
+  ws=new WebSocket(`${proto}://${location.host}/ws/tasks/${id}`)
+  ws.onmessage=e=>{
+    const m=JSON.parse(e.data)
+    log(`${m.type}: ${m.message||m.phase}`)
+    if(m.type==="state_change") refresh()
+  }
+  ws.onclose=()=>log("ws closed")
+}
+async function refresh(){
+  const id=$("taskId").value.trim()
+  if(!id)return
+  const r=await fetch(`${api}/api/v1/tasks/${id}`)
+  show("task", await r.json())
+}
+$("create").onclick=async()=>{
+  const prompt=$("prompt").value.trim()
+  const r=await fetch(`${api}/api/v1/tasks/?prompt=${encodeURIComponent(prompt)}`,{method:"POST"})
+  const data=await r.json()
+  $("taskId").value=data.id||""
+  show("task",data)
+  show("logs","")
+  connect(data.id)
+  log("task created")
+}
+$("refresh").onclick=refresh
+$("approve").onclick=async()=>{
+  const id=$("taskId").value.trim()
+  if(!id)return
+  const r=await fetch(`${api}/api/v1/tasks/${id}/approve`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({approved:true,edited_prompt:$("editedPrompt").value||null})
+  })
+  show("task", await r.json())
+}
+$("reject").onclick=async()=>{
+  const id=$("taskId").value.trim()
+  if(!id)return
+  const r=await fetch(`${api}/api/v1/tasks/${id}/approve`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({approved:false})
+  })
+  show("task", await r.json())
+}
+$("taskId").onchange=()=>connect($("taskId").value.trim())
+</script>

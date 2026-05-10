@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AegisHarness Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/dashboard.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="side-rail" aria-label="Primary">
+      <button class="rail-logo" type="button" data-nav-target="dashboard" aria-label="Open dashboard">
+        <svg viewBox="0 0 24 24" class="icon"><path d="M12 3 5 6v6c0 4.6 2.9 7.8 7 9 4.1-1.2 7-4.4 7-9V6l-7-3Z"/><path d="M9.4 11.2 11 12.8l3.8-3.8"/></svg>
+        <span class="rail-label">Dashboard</span>
+      </button>
+      <div class="rail-stack">
+        <button class="rail-action is-solid" type="button" aria-label="Create agent">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          <span class="rail-label">Create Agent</span>
+        </button>
+        <button class="rail-action" type="button" data-nav-target="dashboard" aria-label="Overview">
+          <svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></svg>
+          <span class="rail-label">Dashboard</span>
+        </button>
+        <button class="rail-action" type="button" data-nav-target="approval" aria-label="Approval console">
+          <svg viewBox="0 0 24 24" class="icon"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>
+          <span class="rail-label">Approval Console</span>
+        </button>
+        <button class="rail-action" type="button" data-nav-target="routing" aria-label="Routing insights">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M7 6h10"/><path d="M7 12h6"/><path d="M7 18h3"/><circle cx="18" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>
+          <span class="rail-label">Routing Insights</span>
+        </button>
+        <button class="rail-action" type="button" data-nav-target="logs" aria-label="Logs">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M7 4h10l3 3v13H7z"/><path d="M17 4v4h4"/><path d="M10 12h7"/><path d="M10 16h4"/></svg>
+          <span class="rail-label">Sandbox Logs</span>
+        </button>
+      </div>
+      <div class="rail-stack rail-stack-bottom">
+        <button class="rail-action" type="button" aria-label="Metrics">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M6 18V9"/><path d="M12 18V5"/><path d="M18 18v-7"/></svg>
+          <span class="rail-label">Metrics</span>
+        </button>
+        <button class="rail-action" type="button" aria-label="Settings">
+          <svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.4 1Z"/></svg>
+          <span class="rail-label">Settings</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <main class="main-content">
+        <div class="page-toolbar">
+          <label class="search-field">
+            <svg viewBox="0 0 24 24" class="icon"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.2-4.2"/></svg>
+            <input id="global-search" type="search" placeholder="Search insights..." autocomplete="off">
+          </label>
+          <div class="toolbar-actions">
+            <button class="icon-button" type="button" aria-label="Alerts">
+              <svg viewBox="0 0 24 24" class="icon"><path d="M15 17H5l1.6-1.8a2 2 0 0 0 .4-1.2V10a5 5 0 1 1 10 0v4c0 .4.1.9.4 1.2L19 17h-4"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+            </button>
+            <button class="icon-button" type="button" aria-label="Help">
+              <svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.8-2.5 2.2-2.5 4"/><circle cx="12" cy="17" r=".6"/></svg>
+            </button>
+            <button class="deploy-button" type="button">Deploy Agent</button>
+            <button class="avatar" type="button" aria-label="Current user">YA</button>
+          </div>
+        </div>
+        <section id="view-dashboard" class="view is-active" aria-labelledby="dashboard-title">
+          <div class="view-header">
+            <div>
+              <h1 id="dashboard-title" class="view-title">Workflow State Machine</h1>
+              <p class="view-subtitle">Real-time control plane for intent parsing, risk review, routing, and sandbox recovery.</p>
+            </div>
+            <div class="header-actions">
+              <button class="secondary-button" type="button" id="export-dashboard-log">Export Log</button>
+            </div>
+          </div>
+
+          <div id="stage-cards" class="stage-grid"></div>
+
+          <div class="content-grid dashboard-grid">
+            <div class="dashboard-column">
+              <article class="panel-card metric-card">
+                <div class="panel-heading">
+                  <span class="eyebrow">System Load</span>
+                  <button class="icon-button icon-button--ghost" type="button" aria-label="Inspect load">
+                    <svg viewBox="0 0 24 24" class="icon"><path d="M14 5h5v5"/><path d="M10 14 19 5"/><path d="M19 14v5h-5"/><path d="m5 19 9-9"/></svg>
+                  </button>
+                </div>
+                <div class="metric-value" id="system-load-value">24.8%</div>
+                <div class="metric-delta" id="system-load-delta">↘ -2.4% from last hour</div>
+              </article>
+
+              <article class="panel-card metric-card">
+                <div class="panel-heading">
+                  <span class="eyebrow">Blocked Risks</span>
+                  <span class="metric-badge">Shielded</span>
+                </div>
+                <div class="metric-value" id="blocked-risks-value">142</div>
+                <div class="metric-delta" id="blocked-risks-delta">↗ +12 since yesterday</div>
+              </article>
+
+              <article class="panel-card overrides-card">
+                <div class="panel-heading">
+                  <span class="eyebrow">Quick Overrides</span>
+                </div>
+                <button class="list-action" type="button" id="bypass-hitl">Bypass HITL Queue</button>
+                <button class="list-action" type="button" id="force-sandbox">Force Sandbox Refresh</button>
+              </article>
+            </div>
+
+            <article class="panel-card stream-card">
+              <div class="panel-toolbar">
+                <div>
+                  <h2 class="panel-title">Live Transaction Stream</h2>
+                </div>
+                <div class="toolbar-actions">
+                  <button class="icon-button icon-button--ghost" type="button" aria-label="Filter stream">
+                    <svg viewBox="0 0 24 24" class="icon"><path d="M4 7h16"/><path d="M7 12h10"/><path d="M10 17h4"/></svg>
+                  </button>
+                  <button class="icon-button icon-button--ghost" type="button" aria-label="More actions">
+                    <svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div id="timeline-feed" class="timeline-feed"></div>
+              <button class="footer-link" type="button" data-nav-target="logs">View All Logs</button>
+            </article>
+          </div>
+        </section>
+
+        <section id="view-workflows" class="view" aria-labelledby="workflows-title">
+          <div id="workflow-approval" class="workflow-panel is-active">
+            <div class="view-header">
+              <div>
+                <h1 id="workflows-title" class="view-title">Approval Console</h1>
+                <p class="view-subtitle">Reviewing structured system prompt <span class="inline-badge" id="prompt-id-badge">PRMP-8824-B</span></p>
+              </div>
+              <div class="header-actions">
+                <span class="severity-pill severity-pill--high" id="approval-risk-pill">High Risk</span>
+              </div>
+            </div>
+
+            <div class="content-grid approval-grid">
+              <article class="panel-card prompt-card">
+                <div class="panel-toolbar prompt-toolbar">
+                  <div class="panel-meta">
+                    <span class="eyebrow">Generated System Prompt</span>
+                  </div>
+                  <div class="panel-meta">Source: Trynia.ai Engine</div>
+                </div>
+                <div id="prompt-surface" class="prompt-surface"></div>
+              </article>
+
+              <article class="panel-card risk-card">
+                <div class="panel-toolbar prompt-toolbar">
+                  <div class="panel-meta">
+                    <span class="eyebrow">Risk Report</span>
+                  </div>
+                  <div class="panel-meta">Scanner: Greptile</div>
+                </div>
+                <div id="risk-list" class="risk-list"></div>
+              </article>
+            </div>
+
+            <div class="action-bar">
+              <div class="action-bar-left">
+                <button class="danger-button" type="button" id="reject-prompt">Reject</button>
+                <button class="secondary-button" type="button" id="edit-prompt">Edit Prompt</button>
+              </div>
+              <button class="primary-button" type="button" id="approve-prompt">Approve &amp; Execute</button>
+            </div>
+          </div>
+
+          <div id="workflow-routing" class="workflow-panel">
+            <div class="view-header">
+              <div>
+                <h1 class="view-title">Dynamic Routing Insights</h1>
+                <p class="view-subtitle">Clod.io dispatch logic, complexity scoring, and model allocation signals.</p>
+              </div>
+              <div class="header-actions">
+                <button class="secondary-button" type="button" id="cycle-range">Last 30 Days</button>
+                <button class="dark-button" type="button" id="export-routing-report">Export Report</button>
+              </div>
+            </div>
+
+            <div class="content-grid routing-grid">
+              <div class="routing-column">
+                <article class="panel-card routing-highlight">
+                  <div class="panel-heading">
+                    <span class="eyebrow">Efficiency Metrics</span>
+                  </div>
+                  <div class="currency-value" id="efficiency-value">$42.8k</div>
+                  <div class="metric-delta" id="efficiency-delta">↗ +14.2% vs previous period</div>
+                  <div class="routing-note">Cost saved via intelligent model routing vs static premium dispatch.</div>
+                </article>
+
+                <article class="panel-card dispatch-card">
+                  <div class="panel-heading">
+                    <div>
+                      <h2 class="panel-title panel-title--compact">Model Dispatch Volume</h2>
+                      <p class="subnote">Live routing distribution across providers.</p>
+                    </div>
+                  </div>
+                  <div id="dispatch-list" class="dispatch-list"></div>
+                </article>
+              </div>
+
+              <div class="routing-main">
+                <article class="panel-card chart-card">
+                  <div class="panel-toolbar">
+                    <h2 class="panel-title">Task Complexity Assessment</h2>
+                    <button class="icon-button icon-button--ghost" type="button" aria-label="More chart actions">
+                      <svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg>
+                    </button>
+                  </div>
+                  <div id="complexity-chart" class="complexity-chart"></div>
+                  <div id="complexity-legend" class="complexity-legend"></div>
+                </article>
+
+                <article class="panel-card code-panel">
+                  <div class="code-panel-header">
+                    <span class="eyebrow">Generated Routing Logic Preview</span>
+                    <button class="icon-button icon-button--ghost" type="button" id="copy-routing-code" aria-label="Copy routing logic">
+                      <svg viewBox="0 0 24 24" class="icon"><rect x="9" y="9" width="10" height="10" rx="2"/><rect x="5" y="5" width="10" height="10" rx="2"/></svg>
+                    </button>
+                  </div>
+                  <pre id="routing-code" class="code-surface"></pre>
+                </article>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-logs" class="view" aria-labelledby="logs-title">
+          <div class="view-header">
+            <div>
+              <h1 id="logs-title" class="view-title">Security &amp; Sandbox Logs</h1>
+              <p class="view-subtitle">Detailed TREX-style execution traces, recovery cycles, and scanner telemetry.</p>
+            </div>
+            <div class="header-actions">
+              <button class="toggle-pill is-active" type="button" id="toggle-secure-mode" aria-pressed="true">Secure Mode</button>
+              <button class="toggle-pill is-active" type="button" id="toggle-auto-refresh" aria-pressed="true">Auto-Refresh</button>
+            </div>
+          </div>
+
+          <div class="content-grid logs-grid-top">
+            <article class="panel-card status-card">
+              <div class="panel-toolbar">
+                <h2 class="panel-title">Sandbox Status</h2>
+                <div class="status-orb" id="sandbox-orb"></div>
+              </div>
+              <div class="info-stack">
+                <div>
+                  <div class="eyebrow">Current State</div>
+                  <div class="status-value" id="sandbox-state">Active Monitoring</div>
+                </div>
+                <div class="info-row"><span>Session ID</span><span id="sandbox-session">TRX-992-A</span></div>
+                <div class="info-row"><span>Environment</span><span id="sandbox-env">Isolated Container 04</span></div>
+                <div class="info-row"><span>Uptime</span><span id="sandbox-uptime">02:14:45</span></div>
+              </div>
+            </article>
+
+            <article class="panel-card scan-card">
+              <div class="panel-toolbar">
+                <h2 class="panel-title">Vulnerability Scan</h2>
+                <button class="secondary-button secondary-button--small" type="button" id="export-scan-report">Export Report</button>
+              </div>
+              <div class="scan-grid">
+                <div class="scan-metric">
+                  <div class="eyebrow">Injection Risks</div>
+                  <div class="scan-value" id="scan-injection">0</div>
+                  <div class="scan-note">Prompt vectors sealed</div>
+                </div>
+                <div class="scan-metric">
+                  <div class="eyebrow">Auth Bypass</div>
+                  <div class="scan-value" id="scan-auth">0</div>
+                  <div class="scan-note">Tool tokens validated</div>
+                </div>
+                <div class="scan-metric scan-metric--warn">
+                  <div class="eyebrow">Data Exfiltration</div>
+                  <div class="scan-value" id="scan-exfiltration">1</div>
+                  <div class="scan-note">Suspicious payload blocked</div>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="content-grid logs-grid-bottom">
+            <article class="panel-card healing-card">
+              <div class="panel-heading">
+                <div>
+                  <h2 class="panel-title">Self-Healing Cycles</h2>
+                  <p class="subnote">Maximum configured cycles: 3. Execution halts on persistent failure.</p>
+                </div>
+              </div>
+              <div id="healing-list" class="healing-list"></div>
+            </article>
+
+            <article class="terminal-card">
+              <div class="terminal-header">
+                <div class="terminal-dots">
+                  <span></span><span></span><span></span>
+                </div>
+                <div class="terminal-file">/var/log/trex-sandbox.log</div>
+              </div>
+              <pre id="terminal-output" class="terminal-output"></pre>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/dashboard.js" defer></script>
+</body>
+</html>
