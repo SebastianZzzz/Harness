@@ -1,3 +1,5 @@
+import "./styles/dashboard.css";
+
 const state = {
   activeNav: "dashboard",
   searchQuery: "",
