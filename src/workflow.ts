@@ -80,7 +80,7 @@ export type DemoCase = {
 };
 
 export type WorkflowState = {
-  taskId?: number;
+  taskId?: string;
   status: WorkflowStatus;
   userRequest: string;
   prompt: string;

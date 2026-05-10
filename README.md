@@ -1,104 +1,86 @@
 # AegisHarness
 
-AegisHarness is an agentic compiler and guardrail console for safer AI coding. It turns a natural-language request into a structured agent brief, pauses for human approval, routes compute by difficulty, and runs generated code through a bounded sandbox repair loop.
-
-This MVP follows the simplified five-phase architecture with live server-side AI calls. Gemini is used first when configured, with Clod as fallback.
+AegisHarness is an agentic compiler and guardrail console for safer AI coding. It turns a natural-language request into a structured agent brief, parses real-world open-source context, pauses for human approval, and runs generated code through a real GitHub sandbox with automated bot reviews.
 
 ## Current Scope
 
-- Frontend MVP: Vite + React + TypeScript
-- Python backend core: standard library only, conda-runnable
-- Person C assets: prompt template, difficulty rubric, demo cases, pitch notes, integration test
-- API mode: Gemini-first AI calls with Clod fallback
-- Terminal state: `FINISHED` after sandbox verification
+- **Frontend MVP**: Vite + React + TypeScript workflow console.
+- **Python Backend**: FastAPI + SQLAlchemy + Uvicorn with persistent task state.
+- **AI Infrastructure**: Gemini-first routing with Clod.io fallback.
+- **Real-World Context**: Integrated with GitHub Search and Greptile for repository analysis.
+- **Agentic Sandbox**: Real GitHub PR loop with automated code reviews and self-repair.
 
 ## Five Phases
 
-1. Intent parsing and zero-hallucination context building
-   - Gemini is used first for context and prompt rewriting when `GEMINI_API_KEY` is set.
-   - Clod is used as fallback when Gemini is not configured.
-   - Person C prompt template rewrites vague input into a structured Markdown system prompt.
+1. **Intent Parsing & Context Building**
+   - Uses **TryniaService** to find top-starred GitHub repositories matching the user's intent.
+   - AI validates repository relevance before extracting patterns.
+   - Rewrites vague requests into a detailed, structured engineering specification.
 
-2. Preflight warning and bug-list generation
-   - The active AI provider returns common implementation and security risks.
-   - Risks are appended as negative constraints in the HITL brief.
+2. **Preflight Bug-List Generation**
+   - Uses **GreptileService** to fetch and analyze READMEs from similar repositories.
+   - Extracts common bugs, security vulnerabilities, and anti-patterns.
+   - Appends these as negative constraints to the final agent brief.
 
-3. Human-in-the-loop confirmation
-   - State machine pauses at `PENDING_APPROVAL`.
-   - User can edit, approve, reject, or clarify the Markdown brief.
+3. **Human-in-the-Loop (HITL) Confirmation**
+   - Pauses at `PENDING_APPROVAL`.
+   - Allows users to review, edit, or reject the structured brief and bug list.
 
-4. Compute estimation and dynamic routing
-   - The backend scores task difficulty from 1 to 5.
-   - The route records the active AI provider/model, preferring Gemini before Clod.
+4. **Compute Routing & Generation**
+   - Scores task difficulty (1-5) and routes to the most cost-effective model via **Clod.io**.
+   - Generates code artifacts strictly adhering to the preflight constraints.
 
-5. Sandboxed testing and self-repair
-   - The active AI provider reviews the generated artifact in the current MVP.
-   - `/greploop` repair is bounded by `max_iterations = 3`.
-   - Passing sandbox results move the task to `FINISHED`.
+5. **GitHub Sandbox & GrepLoop Repair**
+   - Uses **GitHubService** to commit code to a dedicated sandbox repository.
+   - Opens a real Pull Request and waits for the **Greptile App** bot review.
+   - If the bot finds issues, the feedback is fed back into Phase 4 for regeneration (up to 3 iterations).
 
-## Run The Frontend
+## Getting Started
 
-```bash
-npm install
-npm run dev
-```
+### 1. Setup Environment
 
-Build and lint:
-
-```bash
-npm run lint
-npm run build
-```
-
-## API Keys
-
-Use [.env.example](/Users/yaolonghu/Desktop/Harness/.env.example) as the template:
-
-```bash
-cp .env.example .env.local
-```
-
-Then fill in:
-
-```text
-GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-2.5-pro
-CLOD_API_KEY=...
-CLOD_MODEL=GPT OSS 120B
-```
-
-Provider priority is Gemini first, then Clod. Keep `CLOD_API_KEY` available as a fallback.
-
-## Run Python Integration Tests With Conda
-
-Create the environment:
+Create the conda environment and install dependencies:
 
 ```bash
 conda env create -f environment.yml
+conda activate aegis-harness
+pip install -r backend/requirements.txt
 ```
 
-Run the backend integration test:
+### 2. Configure API Keys
 
-```bash
-conda run -n aegis-harness python -m unittest discover -s backend/tests
+Create a `.env` file in the root directory (see `.env.example`):
+
+```text
+GEMINI_API_KEY=your_key
+CLOD_API_KEY=your_key
+GITHUB_TOKEN=your_github_classic_token
+GREPTILE_API_KEY=your_key
+NIA_API_KEY=your_key
 ```
+
+### 3. Run the Project
+
+- **Backend (FastAPI)**: `npm run backend` (Runs on port 8000)
+- **Frontend (Vite)**: `npm run dev` (Runs on port 5173)
+- **Full Test Suite**: `npm run test:python` (Runs 100+ pytest cases)
 
 ## Repository Layout
 
 ```text
 src/                         # Frontend workflow console
-backend/aegis_harness/       # Conda-runnable backend core
-backend/tests/               # Person C integration test
-docs/person-c-playbook.md    # Prompt, routing, demos, pitch notes
-docs/architecture.md         # Five-phase architecture contract
-docs/ide-agent-system-prompt.md
-environment.yml
+backend/aegis_harness/       # AI logic, state machine & prompting
+backend/app/                 # FastAPI routers, services, & ORM
+backend/tests/               # 106-case comprehensive test suite
+docs/                        # Architecture & system prompts
+pyproject.toml               # Pytest configuration
+package.json                 # Project scripts
 ```
 
 ## Demo Path
 
-1. Choose the wallet signing audit demo case.
-2. Click `Build Agent Brief`.
-3. Review the Markdown prompt and risk guide at `PENDING_APPROVAL`.
-4. Click `Approve and Execute`.
-5. Watch routing, generation, sandbox failure, one greploop repair, sandbox pass, and `FINISHED`.
+1. Select a demo case (e.g., **Wallet Signing Audit**).
+2. Click **Build Agent Brief** — watch Phase 1 & 2 search GitHub and analyze READMEs.
+3. Review the **Negative Constraints** and the expanded prompt.
+4. Click **Approve and Execute**.
+5. Phase 5 will open a real PR on GitHub, wait for the Greptile bot review, and perform a self-repair if needed.

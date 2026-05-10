@@ -1,6 +1,19 @@
 name: aegis-harness
 channels:
   - conda-forge
+  - defaults
 dependencies:
   - python=3.11
-
+  - pip
+  - pip:
+      - fastapi==0.109.2
+      - uvicorn[standard]==0.27.1
+      - pydantic==2.6.1
+      - pydantic-settings==2.1.0
+      - httpx==0.26.0
+      - python-dotenv==1.0.1
+      - sqlalchemy==2.0.27
+      - aiosqlite==0.19.0
+      - greenlet==3.0.3
+      - pytest==8.0.0
+      - pytest-asyncio==0.23.5

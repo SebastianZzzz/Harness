@@ -34,3 +34,7 @@ class CodeTask(BaseModel):
 class ApprovalRequest(BaseModel):
     approved: bool
     edited_prompt: Optional[str] = None
+
+class TaskCreateRequest(BaseModel):
+    request: str
+    search_provider: SearchProvider = SearchProvider.GITHUB

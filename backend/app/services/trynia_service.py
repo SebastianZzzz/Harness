@@ -44,9 +44,7 @@ class TryniaService:
     @staticmethod
     async def _extract_keywords_ai(prompt: str, mode: str = "specific") -> str:
         """
-        Use Clod AI to extract the best GitHub search keywords from the prompt.
-        mode="specific": precise keywords for narrow search
-        mode="broad": broader, category-level keywords for fallback search
+        Extract GitHub search keywords using Gemini first, Clod as fallback.
         """
         system_content = (
             "You are a GitHub search query expert. Given a user's natural language request, "
@@ -58,6 +56,17 @@ class TryniaService:
             "'web framework', 'data visualization'). Return 2-3 broad English keywords only, "
             "no explanation, no punctuation."
         )
+        # Try Gemini first
+        try:
+            from app.services.gemini_service import GeminiService
+            keywords = await GeminiService.complete(system=system_content, user=prompt, max_tokens=60)
+            keywords = keywords.strip()
+            print(f"Gemini Keyword Extraction ({mode}): '{prompt[:40]}' -> '{keywords}'")
+            return keywords
+        except Exception as e:
+            print(f"Gemini keyword extraction failed: {e}. Trying Clod...")
+
+        # Fallback to Clod
         payload = {
             "model": "clod-unified-smart",
             "messages": [
@@ -74,7 +83,7 @@ class TryniaService:
             )
             response.raise_for_status()
             keywords = response.json()["choices"][0]["message"]["content"].strip()
-            print(f"AI Keyword Extraction ({mode}): '{prompt}' -> '{keywords}'")
+            print(f"Clod Keyword Extraction ({mode}): '{prompt[:40]}' -> '{keywords}'")
             return keywords
 
     @staticmethod
@@ -216,34 +225,42 @@ class TryniaService:
 
     @staticmethod
     async def generate_structured_prompt(prompt: str, repos: List[str]) -> str:
-        """Phase 1: Rewrite the prompt based on context from similar repos using Clod AI."""
+        """Phase 1: Rewrite the prompt into a detailed engineering spec using Gemini (Clod fallback)."""
         repo_list_str = "\n".join([f"- https://github.com/{repo}" for repo in repos])
-        
+
         system_content = (
-            "You are an expert Software Architect. The user will provide a vague or natural language "
-            "development intent, along with a list of similar high-star open source repositories. "
-            "Your task is to rewrite their vague intent into a professional, highly detailed, and structured "
-            "engineering specification. "
-            "Include suggested architectures, libraries to use, key technical requirements, "
-            "and best practices drawn from the provided context. "
-            "Format the output using markdown headers like '## Architecture', '## Technical Requirements', etc."
+            "You are an expert Software Architect and Security Engineer. "
+            "The user will provide a development intent, along with similar high-star open source repositories. "
+            "Rewrite their intent into a professional, highly detailed, structured engineering specification. "
+            "Include: suggested architecture, libraries, key technical requirements, security considerations, "
+            "and best practices from the provided context. "
+            "Format with markdown headers: '## Architecture', '## Technical Requirements', '## Security Considerations', etc."
         )
-        
+
         user_content = (
             f"Original Intent: {prompt}\n\n"
-            f"Context (Similar Repositories):\n{repo_list_str}\n\n"
-            "Please expand this into a detailed structured engineering prompt."
+            f"Reference Repositories:\n{repo_list_str}\n\n"
+            "Expand this into a detailed structured engineering specification."
         )
-        
-        payload = {
-            "model": "clod-unified-smart",
-            "messages": [
-                {"role": "system", "content": system_content},
-                {"role": "user", "content": user_content}
-            ]
-        }
-        
+
+        # Try Gemini first
         try:
+            from app.services.gemini_service import GeminiService
+            structured = await GeminiService.complete(system=system_content, user=user_content, max_tokens=1200)
+            print(f"Gemini Phase 1: Expanded prompt for '{prompt[:40]}...'")
+            return f"# Structured System Prompt\n\n## Original Intent\n{prompt}\n\n{structured}"
+        except Exception as e:
+            print(f"Gemini prompt expansion failed: {e}. Trying Clod...")
+
+        # Fallback to Clod
+        try:
+            payload = {
+                "model": "clod-unified-smart",
+                "messages": [
+                    {"role": "system", "content": system_content},
+                    {"role": "user", "content": user_content}
+                ]
+            }
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     CLOD_API_URL,
@@ -253,11 +270,10 @@ class TryniaService:
                 )
                 response.raise_for_status()
                 structured = response.json()["choices"][0]["message"]["content"].strip()
-                
-                print(f"Phase 1: Expanded prompt for '{prompt[:20]}...'")
+                print(f"Clod Phase 1: Expanded prompt for '{prompt[:40]}...'")
                 return f"# Structured System Prompt\n\n## Original Intent\n{prompt}\n\n{structured}"
         except Exception as e:
-            print(f"AI Prompt Expansion Error: {e}. Falling back to default template.")
+            print(f"Clod prompt expansion also failed: {e}. Using fallback template.")
             return f"""# Structured System Prompt
 
 ## Original Intent

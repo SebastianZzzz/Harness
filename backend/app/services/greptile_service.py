@@ -165,15 +165,31 @@ class GreptileService:
             f"List them as concise bullet points (max 8 items)."
         )
         
-        payload = {
-            "model": "clod-unified-smart",
-            "messages": [
-                {"role": "system", "content": "You are an expert code quality analyst. Extract actionable constraints to prevent common bugs."},
-                {"role": "user", "content": query_prompt}
-            ]
-        }
+        system_msg = "You are an expert code quality analyst and security engineer. Extract actionable constraints to prevent common bugs and security vulnerabilities."
         
+        # Try Gemini first
         try:
+            from app.services.gemini_service import GeminiService
+            answer = await GeminiService.complete(system=system_msg, user=query_prompt, max_tokens=600)
+            constraints = [
+                line.strip("- *•").strip()
+                for line in answer.split("\n")
+                if line.strip().startswith(("-", "*", "•")) and len(line.strip()) > 10
+            ]
+            print(f"Phase 2 (Gemini analysis): extracted {len(constraints)} constraints")
+            return constraints if constraints else [answer]
+        except Exception as e:
+            print(f"Phase 2 Gemini analysis error: {e}. Trying Clod...")
+
+        # Fallback to Clod
+        try:
+            payload = {
+                "model": "clod-unified-smart",
+                "messages": [
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": query_prompt}
+                ]
+            }
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     CLOD_API_URL,
@@ -195,7 +211,7 @@ class GreptileService:
             return [
                 "Always validate and sanitize all user inputs.",
                 "Avoid bare except clauses; catch specific exceptions.",
-                "Use parameterized queries to prevent SQL injection."
+                "Use parameterized queries to prevent SQL injection.",
             ]
 
     @staticmethod
