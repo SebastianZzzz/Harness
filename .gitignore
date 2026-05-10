@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+node_modules/.tmp/
+__pycache__/
+*.pyc
+.pytest_cache/
