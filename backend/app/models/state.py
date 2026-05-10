@@ -3,6 +3,10 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
+class SearchProvider(str, Enum):
+    NIA = "nia"
+    GITHUB = "github"
+
 class TaskPhase(str, Enum):
     PHASE_1_INTENT = "1_INTENT_PARSING"
     PHASE_2_PRECHECK = "2_PRECHECK_GREPTILE"
@@ -18,6 +22,7 @@ class CodeTask(BaseModel):
     structured_prompt: Optional[str] = None
     bug_list_constraints: List[str] = []
     current_phase: TaskPhase = TaskPhase.PHASE_1_INTENT
+    search_provider: SearchProvider = SearchProvider.GITHUB
     difficulty_score: Optional[int] = None
     selected_model: Optional[str] = None
     generated_code: Optional[str] = None

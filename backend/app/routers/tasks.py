@@ -5,13 +5,14 @@ from typing import Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.models.state import CodeTask, TaskPhase, ApprovalRequest
+from app.models.state import CodeTask, TaskPhase, ApprovalRequest, SearchProvider
 from app.models.orm import TaskRecord
 from app.database import get_db, AsyncSessionLocal
 
 from app.services.trynia_service import TryniaService
 from app.services.greptile_service import GreptileService
 from app.services.clod_service import ClodService
+from app.services.github_service import GitHubService
 from app.routers.websocket import manager
 
 router = APIRouter()
@@ -31,6 +32,7 @@ def record_to_pydantic(record: TaskRecord) -> CodeTask:
         structured_prompt=record.structured_prompt,
         bug_list_constraints=record.bug_list_constraints or [],
         current_phase=TaskPhase(record.current_phase),
+        search_provider=SearchProvider(record.search_provider or "github"),
         difficulty_score=record.difficulty_score,
         selected_model=record.selected_model,
         generated_code=record.generated_code,
@@ -41,21 +43,23 @@ def record_to_pydantic(record: TaskRecord) -> CodeTask:
     )
 
 @router.post("/", response_model=CodeTask)
-async def create_task(prompt: str, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+async def create_task(prompt: str, background_tasks: BackgroundTasks, search_provider: SearchProvider = SearchProvider.GITHUB, db: AsyncSession = Depends(get_db)):
     """
-    Phase 1: Intent Parsing & Context
+    Phase 1: Intent Parsing & Context.
+    search_provider: 'github' (default) or 'nia'
     """
     task_id = str(uuid.uuid4())
     
-    # Phase 1: Use Trynia to get similar repos and build prompt
-    similar_repos = await TryniaService.search_similar_repos(prompt)
+    # Phase 1: Use selected provider to find similar repos
+    similar_repos = await TryniaService.search_similar_repos(prompt, provider=search_provider.value)
     structured_prompt = await TryniaService.generate_structured_prompt(prompt, similar_repos)
     
     new_record = TaskRecord(
         id=task_id,
         original_prompt=prompt,
         structured_prompt=structured_prompt,
-        current_phase=TaskPhase.PHASE_2_PRECHECK.value
+        current_phase=TaskPhase.PHASE_2_PRECHECK.value,
+        search_provider=search_provider.value
     )
     db.add(new_record)
     await db.commit()
@@ -71,14 +75,13 @@ async def trigger_phase_2_bg(task_id: str, similar_repos: list[str]):
 
 async def trigger_phase_2(db: AsyncSession, task_id: str, similar_repos: list[str]):
     """
-    Phase 2: Precheck with Greptile API
+    Phase 2: Analyze similar repos via GitHub README + Clod.
     """
     record = await get_task_by_id(db, task_id)
     if not record: return
     
-    await manager.broadcast_log(task_id, f"Entering Phase 2: Analyzing {len(similar_repos)} similar repos via Greptile...")
+    await manager.broadcast_log(task_id, f"Phase 2: Fetching READMEs from {len(similar_repos)} repos and analyzing with Clod...")
     
-    # Phase 2: Get Bug List Constraints from Greptile using the similar repos
     constraints = await GreptileService.get_bug_list_from_repos(similar_repos, record.original_prompt)
     record.bug_list_constraints = constraints
     
@@ -162,32 +165,46 @@ async def trigger_phase_5_bg(task_id: str):
 
 async def trigger_phase_5(db: AsyncSession, task_id: str):
     """
-    Phase 5: Sandbox Testing with Greptile TREX
+    Phase 5: Greptile Sandbox — submit code as a real GitHub PR,
+    wait for Greptile App to auto-review, and iterate if needed.
     """
     record = await get_task_by_id(db, task_id)
     if not record: return
     
-    await manager.broadcast_log(task_id, "Entering Phase 5: Commencing Sandbox Testing...")
+    await manager.broadcast_log(task_id, "Phase 5: Submitting code to GitHub PR for Greptile review...")
     
-    # Phase 5: Sandbox Testing with Greptile TREX
-    # Implement /greploop mechanism
     while record.sandbox_iterations < record.max_iterations:
         record.sandbox_iterations += 1
         await db.commit()
-        await manager.broadcast_log(task_id, f"Sandbox Iteration {record.sandbox_iterations}/{record.max_iterations}")
+        await manager.broadcast_log(
+            task_id,
+            f"Sandbox iteration {record.sandbox_iterations}/{record.max_iterations}: Opening PR on AegisHarness-Demo..."
+        )
         
-        # Call Greptile to review the generated code against the TARGET_REPO
-        review_result = await GreptileService.review_code(TARGET_REPO, record.generated_code)
+        # Create a real GitHub PR with the generated code, then wait for Greptile review
+        review_result = await GitHubService.run_sandbox(
+            task_id=task_id,
+            prompt=record.original_prompt,
+            code=record.generated_code
+        )
+        
+        pr_url = review_result.get("pr_url", "")
+        if pr_url:
+            await manager.broadcast_log(task_id, f"PR opened: {pr_url}")
         
         if review_result["passed"]:
-            await manager.broadcast_log(task_id, "Sandbox Testing Passed!")
+            await manager.broadcast_log(task_id, "✅ Greptile review passed! Code approved.")
             break
         
-        await manager.broadcast_log(task_id, f"Sandbox failed. Regenerating code...\nReason: {review_result['feedback']}")
+        feedback = review_result.get("feedback", "")
+        await manager.broadcast_log(
+            task_id,
+            f"❌ Greptile found issues. Regenerating...\n\nFeedback:\n{feedback[:500]}"
+        )
         
-        # If it failed, append the feedback to the constraints and regenerate.
-        current_constraints = list(record.bug_list_constraints)
-        current_constraints.append(f"Failed sandbox iteration {record.sandbox_iterations}: {review_result['feedback']}")
+        # Feed Greptile's feedback back as constraints and regenerate
+        current_constraints = list(record.bug_list_constraints or [])
+        current_constraints.append(f"Greptile review (iteration {record.sandbox_iterations}): {feedback}")
         record.bug_list_constraints = current_constraints
         
         _, new_code = await ClodService.evaluate_and_generate(
@@ -196,9 +213,7 @@ async def trigger_phase_5(db: AsyncSession, task_id: str):
         )
         record.generated_code = new_code
         await db.commit()
-
-    # Whether it passed or hit max iterations, mark as finished
+    
     record.current_phase = TaskPhase.FINISHED.value
     await db.commit()
-    
     await manager.broadcast_state_change(task_id, record.current_phase, {"code": record.generated_code})

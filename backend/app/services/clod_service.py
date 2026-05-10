@@ -34,8 +34,7 @@ class ClodService:
             "messages": [
                 {"role": "system", "content": "You are AegisHarness, an expert Agentic Compiler. Output high-quality, secure code that strictly adheres to constraints."},
                 {"role": "user", "content": full_prompt}
-            ],
-            "temperature": 0.2
+            ]
         }
         
         try:
@@ -46,6 +45,8 @@ class ClodService:
                     json=payload,
                     timeout=120.0
                 )
+                if response.status_code != 200:
+                    print(f"Clod API Error Details: {response.text}")
                 response.raise_for_status()
                 data = response.json()
                 
@@ -55,6 +56,9 @@ class ClodService:
                 
                 return actual_model, generated_code
                 
+        except httpx.HTTPStatusError as e:
+            print(f"Clod API HTTP Error (Phase 4): {e.response.status_code} - {e.response.text}")
+            return "mocked-claude-3-haiku", "def mocked_function():\n    pass # Network error with Clod"
         except Exception as e:
             print(f"Clod API Error (Phase 4): {e}")
             # Mock fallback

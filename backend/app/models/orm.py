@@ -11,6 +11,7 @@ class TaskRecord(Base):
     structured_prompt = Column(Text, nullable=True)
     bug_list_constraints = Column(JSON, default=list)
     current_phase = Column(String, default="1_INTENT_PARSING")
+    search_provider = Column(String, default="github")
     difficulty_score = Column(Integer, nullable=True)
     selected_model = Column(String, nullable=True)
     generated_code = Column(Text, nullable=True)
