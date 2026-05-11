@@ -1,5 +1,15 @@
-# Environments
+# --- Frontend ---
+node_modules/
+node_modules/.tmp/
+dist/
+*.local
+*.log
+coverage/
+
+# --- Environment / secrets ---
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -7,16 +17,18 @@ ENV/
 env.bak/
 venv.bak/
 
-# Byte-compiled / optimized / DLL files
+# --- Python ---
 __pycache__/
 *.py[cod]
+*.pyc
 *$py.class
+.pytest_cache/
 
-# Database
+# --- Database ---
 *.sqlite3
 *.db
 
-# OS generated files
+# --- OS ---
 .DS_Store
 .DS_Store?
 ._*
