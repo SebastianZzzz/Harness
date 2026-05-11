@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AegisHarness Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M12 3 5 6v6c0 4.6 2.9 7.8 7 9 4.1-1.2 7-4.4 7-9V6l-7-3Z"></path><path d="M9.4 11.2 11 12.8l3.8-3.8"></path></svg>
+        </div>
+        <div class="brand-copy">
+          <div class="brand-title">Aegis</div>
+          <div class="brand-subtitle">Harness · v0.4</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-heading">Pipeline</div>
+        <button class="sidebar-link is-active" type="button" data-view="workflow">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M7 7h4v4H7z"></path><path d="M13 13h4v4h-4z"></path><path d="M11 9h2"></path><path d="M15 11v2"></path></svg>
+          <span>Workflow</span>
+          <span class="sidebar-count" id="workflow-count">0</span>
+        </button>
+        <button class="sidebar-link" type="button" data-view="approval">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M7 4h8l4 4v12H7z"></path><path d="M15 4v4h4"></path><path d="M10 12h6"></path><path d="M10 16h4"></path></svg>
+          <span>Approval</span>
+        </button>
+        <button class="sidebar-link" type="button" data-view="output">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M4 12h16"></path><path d="M7 7h10"></path><path d="M7 17h10"></path><circle cx="9" cy="12" r="1.5"></circle></svg>
+          <span>Output</span>
+        </button>
+        <button class="sidebar-link" type="button" data-view="logs">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M7 4h10l3 3v13H7z"></path><path d="M17 4v4h4"></path><path d="M10 12h7"></path><path d="M10 16h4"></path></svg>
+          <span>Logs</span>
+          <span class="sidebar-badge" id="logs-live-indicator">idle</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="task-pill">
+          <span class="task-pill-label">Task</span>
+          <input id="task-id-input" class="task-pill-input" type="text" placeholder="Load a task ID">
+          <button class="task-pill-copy" type="button" id="copy-task-id" aria-label="Copy task ID">
+            <svg viewBox="0 0 24 24" class="icon"><rect x="9" y="9" width="10" height="10" rx="2"></rect><rect x="5" y="5" width="10" height="10" rx="2"></rect></svg>
+          </button>
+        </div>
+        <button class="toolbar-button" type="button" id="refresh-task">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M21 12a9 9 0 0 1-15.3 6.4"></path><path d="M3 12A9 9 0 0 1 18.3 5.6"></path><path d="M21 3v6h-6"></path><path d="M3 21v-6h6"></path></svg>
+          <span>Refresh</span>
+        </button>
+        <button class="toolbar-button" type="button" id="load-task">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+          <span>Load task</span>
+        </button>
+        <div class="topbar-spacer"></div>
+        <div class="connection-pill" id="backend-status-pill">
+          <span class="connection-dot" id="backend-status-dot"></span>
+          <span id="backend-status-label">Checking backend</span>
+        </div>
+      </header>
+
+      <main class="content-shell">
+        <section id="view-workflow" class="view is-active">
+          <div class="page-header">
+            <div>
+              <div class="breadcrumb">Pipeline <span>/</span> Workflow</div>
+              <h1 class="page-title">Workflow state machine</h1>
+              <p class="page-subtitle">Create a task, watch the five-phase pipeline run, and monitor approval, code generation, and sandbox review as they progress.</p>
+            </div>
+            <div class="page-actions">
+              <div class="status-chip status-chip--phase" id="workflow-phase-chip">No active task</div>
+            </div>
+          </div>
+
+          <div class="workflow-row">
+            <article class="surface-card create-card">
+              <div class="card-head">
+                <div>
+                  <div class="card-kicker">Step 01</div>
+                  <h2 class="card-title">Create task</h2>
+                </div>
+                <div class="meta-chip">Phase 1-2 auto-start</div>
+              </div>
+
+              <label class="field-label" for="task-request">Request</label>
+              <textarea id="task-request" class="field-textarea" rows="6" placeholder="Describe the feature or code-generation task AegisHarness should execute."></textarea>
+              <div class="field-help">Plain-language description. The planner expands it into a structured prompt with constraints.</div>
+
+              <div class="create-grid">
+                <div>
+                  <label class="field-label" for="search-provider">Search provider</label>
+                  <select id="search-provider" class="field-input">
+                    <option value="github">GitHub</option>
+                    <option value="nia">Nia</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label" for="target-repository">Target repository</label>
+                  <input id="target-repository" class="field-input" type="text" value="AegisHarness-Demo" readonly>
+                </div>
+              </div>
+
+              <div class="create-footer">
+                <div class="meta-row">
+                  <span class="meta-chip" id="retry-chip">3 / retries</span>
+                  <span class="meta-chip">sandbox enabled</span>
+                </div>
+                <button class="primary-cta" type="button" id="create-task">
+                  <span>Start task</span>
+                  <span class="cta-arrow">→</span>
+                </button>
+              </div>
+            </article>
+
+            <article class="surface-card snapshot-card">
+              <div class="card-head">
+                <div>
+                  <div class="card-kicker">Active task</div>
+                  <h2 class="card-title">Task snapshot</h2>
+                </div>
+                <div class="status-chip status-chip--healthy" id="task-health-chip">Idle</div>
+              </div>
+
+              <div class="snapshot-phase" id="snapshot-phase-title">No task</div>
+              <div class="snapshot-phase-copy" id="snapshot-phase-copy">Create or load a task to inspect backend state.</div>
+
+              <div class="info-list">
+                <div class="info-item"><span>Task ID</span><strong id="snapshot-task-id">Not loaded</strong></div>
+                <div class="info-item"><span>Search provider</span><strong id="snapshot-provider">GitHub</strong></div>
+                <div class="info-item"><span>Selected model</span><strong id="snapshot-model">Pending</strong></div>
+                <div class="info-item"><span>Constraints</span><strong id="snapshot-constraints">0 active</strong></div>
+                <div class="info-item"><span>Updated</span><strong id="snapshot-updated">Not available</strong></div>
+              </div>
+            </article>
+          </div>
+
+          <div class="pipeline-summary">
+            <div>
+              <div class="summary-title">Five-phase pipeline</div>
+              <div class="summary-copy">Tap a phase to inspect its inputs, outputs, and latency.</div>
+            </div>
+            <div class="summary-meta">
+              <span class="summary-chip" id="pipeline-total-duration">Duration —</span>
+              <span class="summary-chip" id="pipeline-iteration-status">iter 0 / 3</span>
+            </div>
+          </div>
+
+          <div id="phase-grid" class="phase-grid"></div>
+        </section>
+
+        <section id="view-approval" class="view">
+          <div class="page-header">
+            <div>
+              <div class="breadcrumb">Pipeline <span>/</span> Approval console</div>
+              <h1 class="page-title">Approval console</h1>
+              <p class="page-subtitle">Review the structured prompt, inspect the constraints the planner extracted, and decide whether Phase 4 should run.</p>
+            </div>
+            <div class="page-actions">
+              <div class="status-chip status-chip--healthy" id="approval-header-chip">Awaiting review</div>
+              <button class="toolbar-button toolbar-button--compact" type="button" id="reject-task-header">Reject</button>
+              <button class="primary-cta primary-cta--compact" type="button" id="approve-task-header">
+                <span>Continue to Phase 4</span>
+                <span class="cta-arrow">→</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="approval-layout">
+            <article class="surface-card prompt-card">
+              <div class="card-head">
+                <div>
+                  <div class="card-kicker">Structured prompt</div>
+                  <h2 class="card-title" id="prompt-title">Generated by planner · Phase 2</h2>
+                </div>
+                <div class="meta-chip" id="prompt-meta-chip">github · similar-repo</div>
+              </div>
+              <div id="prompt-surface" class="prompt-surface"></div>
+            </article>
+
+            <div class="approval-side">
+              <article class="surface-card checklist-card">
+                <div class="card-head">
+                  <div>
+                    <div class="card-kicker">Review checklist</div>
+                    <h2 class="card-title" id="constraint-title">Constraints · 0 active</h2>
+                  </div>
+                  <div class="meta-chip" id="constraint-summary-chip">Waiting</div>
+                </div>
+                <div id="review-list" class="review-list"></div>
+              </article>
+
+              <article class="surface-card reviewer-card">
+                <div class="card-head">
+                  <div>
+                    <div class="card-kicker">Reviewer decision</div>
+                    <h2 class="card-title">Prompt override</h2>
+                  </div>
+                </div>
+                <label class="field-label" for="approval-editor">Edited prompt</label>
+                <textarea id="approval-editor" class="field-textarea field-textarea--compact" rows="8" placeholder="Optionally edit the structured prompt before approving Phase 4."></textarea>
+                <div class="field-help">Edits are submitted as the backend's `edited_prompt` payload.</div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-output" class="view">
+          <div class="page-header">
+            <div>
+              <div class="breadcrumb">Pipeline <span>/</span> Generated output</div>
+              <h1 class="page-title">Generated output</h1>
+              <p class="page-subtitle">The model, code, and sandbox state produced by Phase 4 and Phase 5. Diff and review before opening the PR.</p>
+            </div>
+            <div class="page-actions">
+              <div class="status-chip status-chip--healthy" id="output-status-chip">Waiting</div>
+              <button class="toolbar-button toolbar-button--compact" type="button" id="view-diff" disabled>View diff</button>
+              <button class="primary-cta primary-cta--compact" type="button" id="open-pr" disabled>
+                <span>Open PR</span>
+                <span class="cta-arrow">→</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <article class="surface-card metric-surface">
+              <div class="card-kicker">Selected model</div>
+              <div class="metric-title" id="output-model">Pending</div>
+              <div class="metric-copy" id="output-model-copy">Picked during Phase 4 routing.</div>
+            </article>
+            <article class="surface-card metric-surface">
+              <div class="card-kicker">Current phase</div>
+              <div class="metric-title" id="output-phase">Phase 1</div>
+              <div class="metric-copy" id="output-phase-copy">Waiting for execution.</div>
+            </article>
+            <article class="surface-card metric-surface">
+              <div class="card-kicker">Sandbox iterations</div>
+              <div class="metric-title" id="output-iterations">0 / 3</div>
+              <div class="mini-progress"><span id="output-iterations-bar"></span></div>
+            </article>
+            <article class="surface-card metric-surface">
+              <div class="card-kicker">Search provider</div>
+              <div class="metric-title" id="output-provider">GitHub</div>
+              <div class="metric-copy" id="output-provider-copy">No similar repos sampled yet.</div>
+            </article>
+          </div>
+
+          <div class="output-layout">
+            <div class="output-side">
+              <article class="surface-card snapshot-surface">
+                <div class="card-head">
+                  <div>
+                    <div class="card-kicker">Delivery snapshot</div>
+                    <h2 class="card-title" id="delivery-state">Code pending</h2>
+                  </div>
+                </div>
+                <div class="info-list">
+                  <div class="info-item"><span>Task</span><strong id="output-task-id">Not loaded</strong></div>
+                  <div class="info-item"><span>Constraints</span><strong id="output-constraint-total">0</strong></div>
+                  <div class="info-item"><span>Sandbox</span><strong id="output-sandbox">ubuntu-22.04 · py3.12</strong></div>
+                  <div class="info-item"><span>PR branch</span><strong id="output-branch">Not available</strong></div>
+                  <div class="info-item"><span>Updated</span><strong id="output-updated">Not available</strong></div>
+                </div>
+              </article>
+
+              <article class="surface-card phase-log-surface">
+                <div class="card-head">
+                  <div>
+                    <div class="card-kicker">Phase log</div>
+                    <h2 class="card-title">Recent milestones</h2>
+                  </div>
+                </div>
+                <div id="phase-log-list" class="phase-log-list"></div>
+              </article>
+            </div>
+
+            <article class="code-surface-card">
+              <div class="code-surface-header">
+                <div class="terminal-dots"><span></span><span></span><span></span></div>
+                <div class="code-surface-meta">workflow / handler.py · generated</div>
+                <button class="code-copy" type="button" id="copy-generated-code">Copy</button>
+              </div>
+              <pre id="generated-code" class="code-block"></pre>
+            </article>
+          </div>
+        </section>
+
+        <section id="view-logs" class="view">
+          <div class="page-header">
+            <div>
+              <div class="breadcrumb">Pipeline <span>/</span> Execution logs</div>
+              <h1 class="page-title">Execution logs</h1>
+              <p class="page-subtitle">Real-time WebSocket events, sandbox messages, GitHub PR flow, and state transitions emitted by the backend.</p>
+            </div>
+            <div class="page-actions">
+              <button class="status-chip status-chip--healthy status-chip-button" type="button" id="toggle-auto-refresh">Auto-refresh · on</button>
+              <button class="toolbar-button toolbar-button--compact" type="button" id="export-log">Export .log</button>
+              <button class="primary-cta primary-cta--compact" type="button" id="toggle-tail-follow">Tail follow</button>
+            </div>
+          </div>
+
+          <div class="log-summary-grid">
+            <article class="surface-card summary-surface">
+              <div class="card-head">
+                <div>
+                  <div class="card-kicker">Task status</div>
+                  <h2 class="card-title" id="logs-status-title">No active task</h2>
+                </div>
+                <div class="status-chip status-chip--healthy" id="logs-health-chip">Idle</div>
+              </div>
+              <div class="info-list">
+                <div class="info-item"><span>Task ID</span><strong id="logs-task-id">Not loaded</strong></div>
+                <div class="info-item"><span>Search provider</span><strong id="logs-provider">GitHub</strong></div>
+                <div class="info-item"><span>Iterations</span><strong id="logs-iterations">0 / 3</strong></div>
+                <div class="info-item"><span>Last update</span><strong id="logs-updated">Not available</strong></div>
+              </div>
+            </article>
+
+            <article class="surface-card summary-surface">
+              <div class="card-head">
+                <div>
+                  <div class="card-kicker">Delivery flow</div>
+                  <h2 class="card-title" id="logs-repo-title">AegisHarness-Demo</h2>
+                </div>
+                <div class="meta-chip" id="logs-branch-chip">branch pending</div>
+              </div>
+              <div class="info-list">
+                <div class="info-item"><span>Selected model</span><strong id="logs-model">Pending</strong></div>
+                <div class="info-item"><span>Constraint count</span><strong id="logs-constraint-count">0</strong></div>
+                <div class="info-item"><span>PR status</span><strong id="logs-pr-status">Not opened</strong></div>
+                <div class="info-item"><span>Sandbox</span><strong id="logs-sandbox">ubuntu-22.04 · py3.12</strong></div>
+              </div>
+            </article>
+
+            <article class="surface-card summary-surface">
+              <div class="card-head">
+                <div>
+                  <div class="card-kicker">Event mix · last 5m</div>
+                  <h2 class="card-title" id="event-mix-title">0 events</h2>
+                </div>
+                <div class="meta-chip">live</div>
+              </div>
+              <div class="mix-list">
+                <div class="mix-row"><span>Info</span><div class="mix-bar"><span id="mix-info-bar"></span></div><strong id="mix-info-count">0</strong></div>
+                <div class="mix-row"><span>OK</span><div class="mix-bar"><span id="mix-ok-bar"></span></div><strong id="mix-ok-count">0</strong></div>
+                <div class="mix-row"><span>Review</span><div class="mix-bar"><span id="mix-review-bar"></span></div><strong id="mix-review-count">0</strong></div>
+                <div class="mix-row"><span>Error</span><div class="mix-bar"><span id="mix-error-bar"></span></div><strong id="mix-error-count">0</strong></div>
+              </div>
+            </article>
+          </div>
+
+          <article class="terminal-shell">
+            <div class="terminal-shell-header">
+              <div class="terminal-dots"><span></span><span></span><span></span></div>
+              <div class="terminal-shell-meta" id="terminal-title">~ aegis · stream://task/not-loaded</div>
+              <div class="terminal-shell-file">task-execution.log</div>
+            </div>
+            <pre id="terminal-output" class="terminal-shell-output"></pre>
+          </article>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
