@@ -304,7 +304,8 @@ function App() {
     try {
       const health = await fetchHealth();
       setBackendConnected(health.status === "healthy");
-    } catch {
+    } catch (err) {
+      console.error("[DEBUG] Health check failed:", err);
       setBackendConnected(false);
     }
   }
