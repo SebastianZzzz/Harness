@@ -4,9 +4,9 @@ AegisHarness is a self-healing agentic compiler and guardrail console. It transf
 
 # Authors
 
-- @SebastianZzzz
-- @Yiou Li
-- @Allen (Yaolong) Hu
+- @SebastianZzzz (Sebastian Zhu)
+- @li-yiou (Yiou Li)
+- @budengjun (Yaolong Hu)
 
 ## Current Scope
 
