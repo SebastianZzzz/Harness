@@ -18,7 +18,7 @@ from app.routers.websocket import manager
 router = APIRouter()
 
 # Demo Target Repository for Greptile Sandbox
-TARGET_REPO = "sebastianZzzz/AegisHarness-Demo"
+TARGET_REPO = "sebastianZzzz/Harness"
 
 async def get_task_by_id(db: AsyncSession, task_id: str) -> TaskRecord:
     result = await db.execute(select(TaskRecord).where(TaskRecord.id == task_id))
@@ -260,7 +260,7 @@ async def trigger_phase_5(db: AsyncSession, task_id: str):
         await db.commit()
         await manager.broadcast_log(
             task_id,
-            f"Sandbox iteration {record.sandbox_iterations}/{record.max_iterations}: Pushing to AegisHarness-Demo..."
+            f"Sandbox iteration {record.sandbox_iterations}/{record.max_iterations}: Pushing to Harness..."
         )
         
         # Create a real GitHub PR (new one each time on the same branch) and wait for Greptile review
@@ -356,4 +356,3 @@ async def trigger_phase_5(db: AsyncSession, task_id: str):
     record.current_phase = TaskPhase.FINISHED.value
     await db.commit()
     await manager.broadcast_state_change(task_id, record.current_phase, {"code": record.generated_code})
-

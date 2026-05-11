@@ -10,6 +10,7 @@ export type BackendTask = {
   generated_code: string | null;
   sandbox_iterations: number;
   max_iterations: number;
+  target_repo?: string | null;
   created_at: string;
   updated_at: string;
 };

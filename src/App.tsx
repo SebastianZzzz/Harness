@@ -33,7 +33,7 @@ type PhaseMeta = {
 };
 
 const STORAGE_KEY = "aegis.task.id";
-const TARGET_REPO = "AegisHarness-Demo";
+const TARGET_REPO = "Harness";
 
 const PHASES: PhaseMeta[] = [
   { key: "1_INTENT_PARSING", step: "01", title: "Intake", desc: "Parse the request into a structured prompt skeleton.", view: "workflow" },
@@ -479,7 +479,7 @@ function App() {
                     </div>
                     <div className="field">
                       <span className="field-label">Target repository</span>
-                      <input className="input" value={TARGET_REPO} readOnly />
+                      <input className="input" value={displayRepo(task.target_repo)} readOnly />
                     </div>
                   </div>
                   <div className="row-between">
@@ -749,7 +749,7 @@ function App() {
                 <div className="card-head">
                   <div>
                     <div className="eyebrow">Delivery flow</div>
-                    <h3>{TARGET_REPO}</h3>
+                    <h3>{displayRepo(task.target_repo)}</h3>
                   </div>
                   <span className="iter-pill mono">{task.id ? `aegis/${task.id.slice(0, 8)}` : "branch pending"}</span>
                 </div>
@@ -913,6 +913,12 @@ function phaseSnapshotTitle(phase: string) {
 
 function providerLabel(provider: string | null) {
   return provider === "nia" ? "Nia" : "GitHub";
+}
+
+function displayRepo(targetRepo?: string | null) {
+  if (!targetRepo) return TARGET_REPO;
+  const repo = targetRepo.split("/").pop();
+  return repo || TARGET_REPO;
 }
 
 function compactTaskId(taskId: string) {
