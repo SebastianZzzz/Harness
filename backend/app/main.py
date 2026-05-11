@@ -31,6 +31,14 @@ app.add_middleware(
 app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["Tasks"])
 app.include_router(websocket.router, tags=["Websocket"])
 
+@app.get("/")
+async def root():
+    return {
+        "message": "Welcome to AegisHarness API",
+        "docs_url": "/docs",
+        "health_url": "/health"
+    }
+
 @app.get("/health")
 async def health_check():
     return {

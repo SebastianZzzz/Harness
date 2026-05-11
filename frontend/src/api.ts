@@ -11,6 +11,7 @@ export type BackendTask = {
   sandbox_iterations: number;
   max_iterations: number;
   target_repo?: string | null;
+  error_message?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -36,14 +37,35 @@ export async function fetchHealth(): Promise<HealthResponse> {
   return parseJson<HealthResponse>(response);
 }
 
-export async function createTask(request: string, searchProvider: string): Promise<BackendTask> {
+export async function initTask(): Promise<BackendTask> {
   const response = await fetch("/api/v1/tasks/", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  return parseJson<BackendTask>(response);
+}
+
+export async function setTaskConfig(taskId: string, githubToken: string, targetRepo: string): Promise<void> {
+  const response = await fetch(`/api/v1/tasks/${taskId}/config`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      request,
+      github_token: githubToken,
+      target_repo: targetRepo,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to set config: ${response.status}`);
+  }
+}
+
+export async function startTask(taskId: string, request: string, searchProvider: string): Promise<BackendTask> {
+  const response = await fetch(`/api/v1/tasks/${taskId}/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      prompt: request,
       search_provider: searchProvider,
     }),
   });

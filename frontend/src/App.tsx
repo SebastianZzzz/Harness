@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   approveTask,
-  createTask,
+  initTask,
+  setTaskConfig,
+  startTask,
   fetchHealth,
   loadTask,
   rejectTask,
@@ -41,6 +43,7 @@ const PHASES: PhaseMeta[] = [
   { key: "3_HUMAN_IN_THE_LOOP", step: "03", title: "Approval", desc: "Reviewer confirms the structured prompt is safe.", view: "approval" },
   { key: "4_COMPUTE_ROUTING", step: "04", title: "Code gen", desc: "Model writes the implementation against constraints.", view: "output" },
   { key: "5_SANDBOX_TESTING", step: "05", title: "Sandbox", desc: "Run, review, retry up to 3× until checks pass.", view: "logs" },
+  { key: "6_REWRITING", step: "06", title: "Self-repair", desc: "AI fixes bugs found during sandbox review.", view: "output" },
 ];
 
 const EMPTY_TASK: BackendTask = {
@@ -188,6 +191,8 @@ function App() {
   const [task, setTask] = useState<BackendTask>(EMPTY_TASK);
   const [request, setRequest] = useState("");
   const [searchProvider, setSearchProvider] = useState("github");
+  const [githubToken, setGithubToken] = useState("");
+  const [targetRepo, setTargetRepo] = useState("SebastianZzzz/AegisHarness-Demo");
   const [taskInput, setTaskInput] = useState("");
   const [backendConnected, setBackendConnected] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -307,15 +312,30 @@ function App() {
   async function handleCreateTask() {
     const trimmed = request.trim();
     if (!trimmed || loading) return;
+    
+    if (!githubToken || !targetRepo) {
+      alert("Please provide a GitHub Token and Target Repository.");
+      return;
+    }
+    
     setLoading(true);
     try {
-      const created = await createTask(trimmed, searchProvider);
-      setTask(created);
-      setTaskInput(created.id);
-      localStorage.setItem(STORAGE_KEY, created.id);
+      pushLog("INFO", "Initializing task structure...");
+      const initialTask = await initTask();
+      const taskId = initialTask.id;
+
+      pushLog("INFO", "Saving GitHub credentials...");
+      await setTaskConfig(taskId, githubToken, targetRepo);
+
+      pushLog("INFO", "Starting intent parsing...");
+      const started = await startTask(taskId, trimmed, searchProvider);
+      
+      setTask(started);
+      setTaskInput(started.id);
+      localStorage.setItem(STORAGE_KEY, started.id);
       setBackendConnected(true);
       setView("workflow");
-      pushLog("INFO", `Task ${created.id} created`);
+      pushLog("INFO", `Task ${started.id} started successfully`);
     } catch (error) {
       pushLog("ERR", error instanceof Error ? error.message : "Task creation failed");
     } finally {
@@ -478,9 +498,13 @@ function App() {
                       </div>
                     </div>
                     <div className="field">
-                      <span className="field-label">Target repository</span>
-                      <input className="input" value={displayRepo(task.target_repo)} readOnly />
+                      <span className="field-label">GitHub Token</span>
+                      <input className="input" type="password" placeholder="ghp_..." value={githubToken} onChange={(event) => setGithubToken(event.target.value)} />
                     </div>
+                  </div>
+                  <div className="field">
+                    <span className="field-label">Target repository</span>
+                    <input className="input" value={targetRepo} onChange={(event) => setTargetRepo(event.target.value)} />
                   </div>
                   <div className="row-between">
                     <div className="hgap-8">
