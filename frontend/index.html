@@ -10,305 +10,361 @@
 </head>
 <body>
   <div class="app-shell">
-    <aside class="side-rail" aria-label="Primary">
-      <button class="rail-logo" type="button" data-nav-target="dashboard" aria-label="Open dashboard">
-        <svg viewBox="0 0 24 24" class="icon"><path d="M12 3 5 6v6c0 4.6 2.9 7.8 7 9 4.1-1.2 7-4.4 7-9V6l-7-3Z"/><path d="M9.4 11.2 11 12.8l3.8-3.8"/></svg>
-        <span class="rail-label">Dashboard</span>
-      </button>
-      <div class="rail-stack">
-        <button class="rail-action is-solid" type="button" aria-label="Create agent">
-          <svg viewBox="0 0 24 24" class="icon"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-          <span class="rail-label">Create Agent</span>
-        </button>
-        <button class="rail-action" type="button" data-nav-target="dashboard" aria-label="Overview">
-          <svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></svg>
-          <span class="rail-label">Dashboard</span>
-        </button>
-        <button class="rail-action" type="button" data-nav-target="approval" aria-label="Approval console">
-          <svg viewBox="0 0 24 24" class="icon"><rect x="6" y="4" width="12" height="16" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h4"/></svg>
-          <span class="rail-label">Approval Console</span>
-        </button>
-        <button class="rail-action" type="button" data-nav-target="routing" aria-label="Routing insights">
-          <svg viewBox="0 0 24 24" class="icon"><path d="M7 6h10"/><path d="M7 12h6"/><path d="M7 18h3"/><circle cx="18" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="12" cy="18" r="2"/></svg>
-          <span class="rail-label">Routing Insights</span>
-        </button>
-        <button class="rail-action" type="button" data-nav-target="logs" aria-label="Logs">
-          <svg viewBox="0 0 24 24" class="icon"><path d="M7 4h10l3 3v13H7z"/><path d="M17 4v4h4"/><path d="M10 12h7"/><path d="M10 16h4"/></svg>
-          <span class="rail-label">Sandbox Logs</span>
-        </button>
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M12 3 5 6v6c0 4.6 2.9 7.8 7 9 4.1-1.2 7-4.4 7-9V6l-7-3Z"></path><path d="M9.4 11.2 11 12.8l3.8-3.8"></path></svg>
+        </div>
+        <div class="brand-copy">
+          <div class="brand-title">Aegis</div>
+          <div class="brand-subtitle">Harness · v0.4</div>
+        </div>
       </div>
-      <div class="rail-stack rail-stack-bottom">
-        <button class="rail-action" type="button" aria-label="Metrics">
-          <svg viewBox="0 0 24 24" class="icon"><path d="M6 18V9"/><path d="M12 18V5"/><path d="M18 18v-7"/></svg>
-          <span class="rail-label">Metrics</span>
+
+      <div class="sidebar-section">
+        <div class="sidebar-heading">Pipeline</div>
+        <button class="sidebar-link is-active" type="button" data-view="workflow">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M7 7h4v4H7z"></path><path d="M13 13h4v4h-4z"></path><path d="M11 9h2"></path><path d="M15 11v2"></path></svg>
+          <span>Workflow</span>
+          <span class="sidebar-count" id="workflow-count">0</span>
         </button>
-        <button class="rail-action" type="button" aria-label="Settings">
-          <svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.4 1Z"/></svg>
-          <span class="rail-label">Settings</span>
+        <button class="sidebar-link" type="button" data-view="approval">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M7 4h8l4 4v12H7z"></path><path d="M15 4v4h4"></path><path d="M10 12h6"></path><path d="M10 16h4"></path></svg>
+          <span>Approval</span>
+        </button>
+        <button class="sidebar-link" type="button" data-view="output">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M4 12h16"></path><path d="M7 7h10"></path><path d="M7 17h10"></path><circle cx="9" cy="12" r="1.5"></circle></svg>
+          <span>Output</span>
+        </button>
+        <button class="sidebar-link" type="button" data-view="logs">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M7 4h10l3 3v13H7z"></path><path d="M17 4v4h4"></path><path d="M10 12h7"></path><path d="M10 16h4"></path></svg>
+          <span>Logs</span>
+          <span class="sidebar-badge" id="logs-live-indicator">idle</span>
         </button>
       </div>
     </aside>
 
     <div class="workspace">
-      <main class="main-content">
-        <div class="page-toolbar">
-          <label class="search-field">
-            <svg viewBox="0 0 24 24" class="icon"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.2-4.2"/></svg>
-            <input id="global-search" type="search" placeholder="Search insights..." autocomplete="off">
-          </label>
-          <div class="toolbar-actions">
-            <button class="icon-button" type="button" aria-label="Alerts">
-              <svg viewBox="0 0 24 24" class="icon"><path d="M15 17H5l1.6-1.8a2 2 0 0 0 .4-1.2V10a5 5 0 1 1 10 0v4c0 .4.1.9.4 1.2L19 17h-4"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
-            </button>
-            <button class="icon-button" type="button" aria-label="Help">
-              <svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.8-2.5 2.2-2.5 4"/><circle cx="12" cy="17" r=".6"/></svg>
-            </button>
-            <button class="deploy-button" type="button">Deploy Agent</button>
-            <button class="avatar" type="button" aria-label="Current user">YA</button>
-          </div>
+      <header class="topbar">
+        <div class="task-pill">
+          <span class="task-pill-label">Task</span>
+          <input id="task-id-input" class="task-pill-input" type="text" placeholder="Load a task ID">
+          <button class="task-pill-copy" type="button" id="copy-task-id" aria-label="Copy task ID">
+            <svg viewBox="0 0 24 24" class="icon"><rect x="9" y="9" width="10" height="10" rx="2"></rect><rect x="5" y="5" width="10" height="10" rx="2"></rect></svg>
+          </button>
         </div>
-        <section id="view-dashboard" class="view is-active" aria-labelledby="dashboard-title">
-          <div class="view-header">
+        <button class="toolbar-button" type="button" id="refresh-task">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M21 12a9 9 0 0 1-15.3 6.4"></path><path d="M3 12A9 9 0 0 1 18.3 5.6"></path><path d="M21 3v6h-6"></path><path d="M3 21v-6h6"></path></svg>
+          <span>Refresh</span>
+        </button>
+        <button class="toolbar-button" type="button" id="load-task">
+          <svg viewBox="0 0 24 24" class="icon"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+          <span>Load task</span>
+        </button>
+        <div class="topbar-spacer"></div>
+        <div class="connection-pill" id="backend-status-pill">
+          <span class="connection-dot" id="backend-status-dot"></span>
+          <span id="backend-status-label">Checking backend</span>
+        </div>
+      </header>
+
+      <main class="content-shell">
+        <section id="view-workflow" class="view is-active">
+          <div class="page-header">
             <div>
-              <h1 id="dashboard-title" class="view-title">Workflow State Machine</h1>
-              <p class="view-subtitle">Real-time control plane for intent parsing, risk review, routing, and sandbox recovery.</p>
+              <div class="breadcrumb">Pipeline <span>/</span> Workflow</div>
+              <h1 class="page-title">Workflow state machine</h1>
+              <p class="page-subtitle">Create a task, watch the five-phase pipeline run, and monitor approval, code generation, and sandbox review as they progress.</p>
             </div>
-            <div class="header-actions">
-              <button class="secondary-button" type="button" id="export-dashboard-log">Export Log</button>
+            <div class="page-actions">
+              <div class="status-chip status-chip--phase" id="workflow-phase-chip">No active task</div>
             </div>
           </div>
 
-          <div id="stage-cards" class="stage-grid"></div>
-
-          <div class="content-grid dashboard-grid">
-            <div class="dashboard-column">
-              <article class="panel-card metric-card">
-                <div class="panel-heading">
-                  <span class="eyebrow">System Load</span>
-                  <button class="icon-button icon-button--ghost" type="button" aria-label="Inspect load">
-                    <svg viewBox="0 0 24 24" class="icon"><path d="M14 5h5v5"/><path d="M10 14 19 5"/><path d="M19 14v5h-5"/><path d="m5 19 9-9"/></svg>
-                  </button>
-                </div>
-                <div class="metric-value" id="system-load-value">24.8%</div>
-                <div class="metric-delta" id="system-load-delta">↘ -2.4% from last hour</div>
-              </article>
-
-              <article class="panel-card metric-card">
-                <div class="panel-heading">
-                  <span class="eyebrow">Blocked Risks</span>
-                  <span class="metric-badge">Shielded</span>
-                </div>
-                <div class="metric-value" id="blocked-risks-value">142</div>
-                <div class="metric-delta" id="blocked-risks-delta">↗ +12 since yesterday</div>
-              </article>
-
-              <article class="panel-card overrides-card">
-                <div class="panel-heading">
-                  <span class="eyebrow">Quick Overrides</span>
-                </div>
-                <button class="list-action" type="button" id="bypass-hitl">Bypass HITL Queue</button>
-                <button class="list-action" type="button" id="force-sandbox">Force Sandbox Refresh</button>
-              </article>
-            </div>
-
-            <article class="panel-card stream-card">
-              <div class="panel-toolbar">
+          <div class="workflow-row">
+            <article class="surface-card create-card">
+              <div class="card-head">
                 <div>
-                  <h2 class="panel-title">Live Transaction Stream</h2>
+                  <div class="card-kicker">Step 01</div>
+                  <h2 class="card-title">Create task</h2>
                 </div>
-                <div class="toolbar-actions">
-                  <button class="icon-button icon-button--ghost" type="button" aria-label="Filter stream">
-                    <svg viewBox="0 0 24 24" class="icon"><path d="M4 7h16"/><path d="M7 12h10"/><path d="M10 17h4"/></svg>
-                  </button>
-                  <button class="icon-button icon-button--ghost" type="button" aria-label="More actions">
-                    <svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg>
-                  </button>
+                <div class="meta-chip">Phase 1-2 auto-start</div>
+              </div>
+
+              <label class="field-label" for="task-request">Request</label>
+              <textarea id="task-request" class="field-textarea" rows="6" placeholder="Describe the feature or code-generation task AegisHarness should execute."></textarea>
+              <div class="field-help">Plain-language description. The planner expands it into a structured prompt with constraints.</div>
+
+              <div class="create-grid">
+                <div>
+                  <label class="field-label" for="search-provider">Search provider</label>
+                  <select id="search-provider" class="field-input">
+                    <option value="github">GitHub</option>
+                    <option value="nia">Nia</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label" for="target-repository">Target repository</label>
+                  <input id="target-repository" class="field-input" type="text" value="AegisHarness-Demo" readonly>
                 </div>
               </div>
-              <div id="timeline-feed" class="timeline-feed"></div>
-              <button class="footer-link" type="button" data-nav-target="logs">View All Logs</button>
+
+              <div class="create-footer">
+                <div class="meta-row">
+                  <span class="meta-chip" id="retry-chip">3 / retries</span>
+                  <span class="meta-chip">sandbox enabled</span>
+                </div>
+                <button class="primary-cta" type="button" id="create-task">
+                  <span>Start task</span>
+                  <span class="cta-arrow">→</span>
+                </button>
+              </div>
+            </article>
+
+            <article class="surface-card snapshot-card">
+              <div class="card-head">
+                <div>
+                  <div class="card-kicker">Active task</div>
+                  <h2 class="card-title">Task snapshot</h2>
+                </div>
+                <div class="status-chip status-chip--healthy" id="task-health-chip">Idle</div>
+              </div>
+
+              <div class="snapshot-phase" id="snapshot-phase-title">No task</div>
+              <div class="snapshot-phase-copy" id="snapshot-phase-copy">Create or load a task to inspect backend state.</div>
+
+              <div class="info-list">
+                <div class="info-item"><span>Task ID</span><strong id="snapshot-task-id">Not loaded</strong></div>
+                <div class="info-item"><span>Search provider</span><strong id="snapshot-provider">GitHub</strong></div>
+                <div class="info-item"><span>Selected model</span><strong id="snapshot-model">Pending</strong></div>
+                <div class="info-item"><span>Constraints</span><strong id="snapshot-constraints">0 active</strong></div>
+                <div class="info-item"><span>Updated</span><strong id="snapshot-updated">Not available</strong></div>
+              </div>
             </article>
           </div>
-        </section>
 
-        <section id="view-workflows" class="view" aria-labelledby="workflows-title">
-          <div id="workflow-approval" class="workflow-panel is-active">
-            <div class="view-header">
-              <div>
-                <h1 id="workflows-title" class="view-title">Approval Console</h1>
-                <p class="view-subtitle">Reviewing structured system prompt <span class="inline-badge" id="prompt-id-badge">PRMP-8824-B</span></p>
-              </div>
-              <div class="header-actions">
-                <span class="severity-pill severity-pill--high" id="approval-risk-pill">High Risk</span>
-              </div>
+          <div class="pipeline-summary">
+            <div>
+              <div class="summary-title">Five-phase pipeline</div>
+              <div class="summary-copy">Tap a phase to inspect its inputs, outputs, and latency.</div>
             </div>
-
-            <div class="content-grid approval-grid">
-              <article class="panel-card prompt-card">
-                <div class="panel-toolbar prompt-toolbar">
-                  <div class="panel-meta">
-                    <span class="eyebrow">Generated System Prompt</span>
-                  </div>
-                  <div class="panel-meta">Source: Trynia.ai Engine</div>
-                </div>
-                <div id="prompt-surface" class="prompt-surface"></div>
-              </article>
-
-              <article class="panel-card risk-card">
-                <div class="panel-toolbar prompt-toolbar">
-                  <div class="panel-meta">
-                    <span class="eyebrow">Risk Report</span>
-                  </div>
-                  <div class="panel-meta">Scanner: Greptile</div>
-                </div>
-                <div id="risk-list" class="risk-list"></div>
-              </article>
-            </div>
-
-            <div class="action-bar">
-              <div class="action-bar-left">
-                <button class="danger-button" type="button" id="reject-prompt">Reject</button>
-                <button class="secondary-button" type="button" id="edit-prompt">Edit Prompt</button>
-              </div>
-              <button class="primary-button" type="button" id="approve-prompt">Approve &amp; Execute</button>
+            <div class="summary-meta">
+              <span class="summary-chip" id="pipeline-total-duration">Duration —</span>
+              <span class="summary-chip" id="pipeline-iteration-status">iter 0 / 3</span>
             </div>
           </div>
 
-          <div id="workflow-routing" class="workflow-panel">
-            <div class="view-header">
-              <div>
-                <h1 class="view-title">Dynamic Routing Insights</h1>
-                <p class="view-subtitle">Clod.io dispatch logic, complexity scoring, and model allocation signals.</p>
-              </div>
-              <div class="header-actions">
-                <button class="secondary-button" type="button" id="cycle-range">Last 30 Days</button>
-                <button class="dark-button" type="button" id="export-routing-report">Export Report</button>
-              </div>
+          <div id="phase-grid" class="phase-grid"></div>
+        </section>
+
+        <section id="view-approval" class="view">
+          <div class="page-header">
+            <div>
+              <div class="breadcrumb">Pipeline <span>/</span> Approval console</div>
+              <h1 class="page-title">Approval console</h1>
+              <p class="page-subtitle">Review the structured prompt, inspect the constraints the planner extracted, and decide whether Phase 4 should run.</p>
             </div>
+            <div class="page-actions">
+              <div class="status-chip status-chip--healthy" id="approval-header-chip">Awaiting review</div>
+              <button class="toolbar-button toolbar-button--compact" type="button" id="reject-task-header">Reject</button>
+              <button class="primary-cta primary-cta--compact" type="button" id="approve-task-header">
+                <span>Continue to Phase 4</span>
+                <span class="cta-arrow">→</span>
+              </button>
+            </div>
+          </div>
 
-            <div class="content-grid routing-grid">
-              <div class="routing-column">
-                <article class="panel-card routing-highlight">
-                  <div class="panel-heading">
-                    <span class="eyebrow">Efficiency Metrics</span>
-                  </div>
-                  <div class="currency-value" id="efficiency-value">$42.8k</div>
-                  <div class="metric-delta" id="efficiency-delta">↗ +14.2% vs previous period</div>
-                  <div class="routing-note">Cost saved via intelligent model routing vs static premium dispatch.</div>
-                </article>
-
-                <article class="panel-card dispatch-card">
-                  <div class="panel-heading">
-                    <div>
-                      <h2 class="panel-title panel-title--compact">Model Dispatch Volume</h2>
-                      <p class="subnote">Live routing distribution across providers.</p>
-                    </div>
-                  </div>
-                  <div id="dispatch-list" class="dispatch-list"></div>
-                </article>
+          <div class="approval-layout">
+            <article class="surface-card prompt-card">
+              <div class="card-head">
+                <div>
+                  <div class="card-kicker">Structured prompt</div>
+                  <h2 class="card-title" id="prompt-title">Generated by planner · Phase 2</h2>
+                </div>
+                <div class="meta-chip" id="prompt-meta-chip">github · similar-repo</div>
               </div>
+              <div id="prompt-surface" class="prompt-surface"></div>
+            </article>
 
-              <div class="routing-main">
-                <article class="panel-card chart-card">
-                  <div class="panel-toolbar">
-                    <h2 class="panel-title">Task Complexity Assessment</h2>
-                    <button class="icon-button icon-button--ghost" type="button" aria-label="More chart actions">
-                      <svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg>
-                    </button>
+            <div class="approval-side">
+              <article class="surface-card checklist-card">
+                <div class="card-head">
+                  <div>
+                    <div class="card-kicker">Review checklist</div>
+                    <h2 class="card-title" id="constraint-title">Constraints · 0 active</h2>
                   </div>
-                  <div id="complexity-chart" class="complexity-chart"></div>
-                  <div id="complexity-legend" class="complexity-legend"></div>
-                </article>
+                  <div class="meta-chip" id="constraint-summary-chip">Waiting</div>
+                </div>
+                <div id="review-list" class="review-list"></div>
+              </article>
 
-                <article class="panel-card code-panel">
-                  <div class="code-panel-header">
-                    <span class="eyebrow">Generated Routing Logic Preview</span>
-                    <button class="icon-button icon-button--ghost" type="button" id="copy-routing-code" aria-label="Copy routing logic">
-                      <svg viewBox="0 0 24 24" class="icon"><rect x="9" y="9" width="10" height="10" rx="2"/><rect x="5" y="5" width="10" height="10" rx="2"/></svg>
-                    </button>
+              <article class="surface-card reviewer-card">
+                <div class="card-head">
+                  <div>
+                    <div class="card-kicker">Reviewer decision</div>
+                    <h2 class="card-title">Prompt override</h2>
                   </div>
-                  <pre id="routing-code" class="code-surface"></pre>
-                </article>
-              </div>
+                </div>
+                <label class="field-label" for="approval-editor">Edited prompt</label>
+                <textarea id="approval-editor" class="field-textarea field-textarea--compact" rows="8" placeholder="Optionally edit the structured prompt before approving Phase 4."></textarea>
+                <div class="field-help">Edits are submitted as the backend's `edited_prompt` payload.</div>
+              </article>
             </div>
           </div>
         </section>
 
-        <section id="view-logs" class="view" aria-labelledby="logs-title">
-          <div class="view-header">
+        <section id="view-output" class="view">
+          <div class="page-header">
             <div>
-              <h1 id="logs-title" class="view-title">Security &amp; Sandbox Logs</h1>
-              <p class="view-subtitle">Detailed TREX-style execution traces, recovery cycles, and scanner telemetry.</p>
+              <div class="breadcrumb">Pipeline <span>/</span> Generated output</div>
+              <h1 class="page-title">Generated output</h1>
+              <p class="page-subtitle">The model, code, and sandbox state produced by Phase 4 and Phase 5. Diff and review before opening the PR.</p>
             </div>
-            <div class="header-actions">
-              <button class="toggle-pill is-active" type="button" id="toggle-secure-mode" aria-pressed="true">Secure Mode</button>
-              <button class="toggle-pill is-active" type="button" id="toggle-auto-refresh" aria-pressed="true">Auto-Refresh</button>
+            <div class="page-actions">
+              <div class="status-chip status-chip--healthy" id="output-status-chip">Waiting</div>
+              <button class="toolbar-button toolbar-button--compact" type="button" id="view-diff" disabled>View diff</button>
+              <button class="primary-cta primary-cta--compact" type="button" id="open-pr" disabled>
+                <span>Open PR</span>
+                <span class="cta-arrow">→</span>
+              </button>
             </div>
           </div>
 
-          <div class="content-grid logs-grid-top">
-            <article class="panel-card status-card">
-              <div class="panel-toolbar">
-                <h2 class="panel-title">Sandbox Status</h2>
-                <div class="status-orb" id="sandbox-orb"></div>
-              </div>
-              <div class="info-stack">
-                <div>
-                  <div class="eyebrow">Current State</div>
-                  <div class="status-value" id="sandbox-state">Active Monitoring</div>
+          <div class="metric-grid">
+            <article class="surface-card metric-surface">
+              <div class="card-kicker">Selected model</div>
+              <div class="metric-title" id="output-model">Pending</div>
+              <div class="metric-copy" id="output-model-copy">Picked during Phase 4 routing.</div>
+            </article>
+            <article class="surface-card metric-surface">
+              <div class="card-kicker">Current phase</div>
+              <div class="metric-title" id="output-phase">Phase 1</div>
+              <div class="metric-copy" id="output-phase-copy">Waiting for execution.</div>
+            </article>
+            <article class="surface-card metric-surface">
+              <div class="card-kicker">Sandbox iterations</div>
+              <div class="metric-title" id="output-iterations">0 / 3</div>
+              <div class="mini-progress"><span id="output-iterations-bar"></span></div>
+            </article>
+            <article class="surface-card metric-surface">
+              <div class="card-kicker">Search provider</div>
+              <div class="metric-title" id="output-provider">GitHub</div>
+              <div class="metric-copy" id="output-provider-copy">No similar repos sampled yet.</div>
+            </article>
+          </div>
+
+          <div class="output-layout">
+            <div class="output-side">
+              <article class="surface-card snapshot-surface">
+                <div class="card-head">
+                  <div>
+                    <div class="card-kicker">Delivery snapshot</div>
+                    <h2 class="card-title" id="delivery-state">Code pending</h2>
+                  </div>
                 </div>
-                <div class="info-row"><span>Session ID</span><span id="sandbox-session">TRX-992-A</span></div>
-                <div class="info-row"><span>Environment</span><span id="sandbox-env">Isolated Container 04</span></div>
-                <div class="info-row"><span>Uptime</span><span id="sandbox-uptime">02:14:45</span></div>
+                <div class="info-list">
+                  <div class="info-item"><span>Task</span><strong id="output-task-id">Not loaded</strong></div>
+                  <div class="info-item"><span>Constraints</span><strong id="output-constraint-total">0</strong></div>
+                  <div class="info-item"><span>Sandbox</span><strong id="output-sandbox">ubuntu-22.04 · py3.12</strong></div>
+                  <div class="info-item"><span>PR branch</span><strong id="output-branch">Not available</strong></div>
+                  <div class="info-item"><span>Updated</span><strong id="output-updated">Not available</strong></div>
+                </div>
+              </article>
+
+              <article class="surface-card phase-log-surface">
+                <div class="card-head">
+                  <div>
+                    <div class="card-kicker">Phase log</div>
+                    <h2 class="card-title">Recent milestones</h2>
+                  </div>
+                </div>
+                <div id="phase-log-list" class="phase-log-list"></div>
+              </article>
+            </div>
+
+            <article class="code-surface-card">
+              <div class="code-surface-header">
+                <div class="terminal-dots"><span></span><span></span><span></span></div>
+                <div class="code-surface-meta">workflow / handler.py · generated</div>
+                <button class="code-copy" type="button" id="copy-generated-code">Copy</button>
+              </div>
+              <pre id="generated-code" class="code-block"></pre>
+            </article>
+          </div>
+        </section>
+
+        <section id="view-logs" class="view">
+          <div class="page-header">
+            <div>
+              <div class="breadcrumb">Pipeline <span>/</span> Execution logs</div>
+              <h1 class="page-title">Execution logs</h1>
+              <p class="page-subtitle">Real-time WebSocket events, sandbox messages, GitHub PR flow, and state transitions emitted by the backend.</p>
+            </div>
+            <div class="page-actions">
+              <button class="status-chip status-chip--healthy status-chip-button" type="button" id="toggle-auto-refresh">Auto-refresh · on</button>
+              <button class="toolbar-button toolbar-button--compact" type="button" id="export-log">Export .log</button>
+              <button class="primary-cta primary-cta--compact" type="button" id="toggle-tail-follow">Tail follow</button>
+            </div>
+          </div>
+
+          <div class="log-summary-grid">
+            <article class="surface-card summary-surface">
+              <div class="card-head">
+                <div>
+                  <div class="card-kicker">Task status</div>
+                  <h2 class="card-title" id="logs-status-title">No active task</h2>
+                </div>
+                <div class="status-chip status-chip--healthy" id="logs-health-chip">Idle</div>
+              </div>
+              <div class="info-list">
+                <div class="info-item"><span>Task ID</span><strong id="logs-task-id">Not loaded</strong></div>
+                <div class="info-item"><span>Search provider</span><strong id="logs-provider">GitHub</strong></div>
+                <div class="info-item"><span>Iterations</span><strong id="logs-iterations">0 / 3</strong></div>
+                <div class="info-item"><span>Last update</span><strong id="logs-updated">Not available</strong></div>
               </div>
             </article>
 
-            <article class="panel-card scan-card">
-              <div class="panel-toolbar">
-                <h2 class="panel-title">Vulnerability Scan</h2>
-                <button class="secondary-button secondary-button--small" type="button" id="export-scan-report">Export Report</button>
+            <article class="surface-card summary-surface">
+              <div class="card-head">
+                <div>
+                  <div class="card-kicker">Delivery flow</div>
+                  <h2 class="card-title" id="logs-repo-title">AegisHarness-Demo</h2>
+                </div>
+                <div class="meta-chip" id="logs-branch-chip">branch pending</div>
               </div>
-              <div class="scan-grid">
-                <div class="scan-metric">
-                  <div class="eyebrow">Injection Risks</div>
-                  <div class="scan-value" id="scan-injection">0</div>
-                  <div class="scan-note">Prompt vectors sealed</div>
+              <div class="info-list">
+                <div class="info-item"><span>Selected model</span><strong id="logs-model">Pending</strong></div>
+                <div class="info-item"><span>Constraint count</span><strong id="logs-constraint-count">0</strong></div>
+                <div class="info-item"><span>PR status</span><strong id="logs-pr-status">Not opened</strong></div>
+                <div class="info-item"><span>Sandbox</span><strong id="logs-sandbox">ubuntu-22.04 · py3.12</strong></div>
+              </div>
+            </article>
+
+            <article class="surface-card summary-surface">
+              <div class="card-head">
+                <div>
+                  <div class="card-kicker">Event mix · last 5m</div>
+                  <h2 class="card-title" id="event-mix-title">0 events</h2>
                 </div>
-                <div class="scan-metric">
-                  <div class="eyebrow">Auth Bypass</div>
-                  <div class="scan-value" id="scan-auth">0</div>
-                  <div class="scan-note">Tool tokens validated</div>
-                </div>
-                <div class="scan-metric scan-metric--warn">
-                  <div class="eyebrow">Data Exfiltration</div>
-                  <div class="scan-value" id="scan-exfiltration">1</div>
-                  <div class="scan-note">Suspicious payload blocked</div>
-                </div>
+                <div class="meta-chip">live</div>
+              </div>
+              <div class="mix-list">
+                <div class="mix-row"><span>Info</span><div class="mix-bar"><span id="mix-info-bar"></span></div><strong id="mix-info-count">0</strong></div>
+                <div class="mix-row"><span>OK</span><div class="mix-bar"><span id="mix-ok-bar"></span></div><strong id="mix-ok-count">0</strong></div>
+                <div class="mix-row"><span>Review</span><div class="mix-bar"><span id="mix-review-bar"></span></div><strong id="mix-review-count">0</strong></div>
+                <div class="mix-row"><span>Error</span><div class="mix-bar"><span id="mix-error-bar"></span></div><strong id="mix-error-count">0</strong></div>
               </div>
             </article>
           </div>
 
-          <div class="content-grid logs-grid-bottom">
-            <article class="panel-card healing-card">
-              <div class="panel-heading">
-                <div>
-                  <h2 class="panel-title">Self-Healing Cycles</h2>
-                  <p class="subnote">Maximum configured cycles: 3. Execution halts on persistent failure.</p>
-                </div>
-              </div>
-              <div id="healing-list" class="healing-list"></div>
-            </article>
-
-            <article class="terminal-card">
-              <div class="terminal-header">
-                <div class="terminal-dots">
-                  <span></span><span></span><span></span>
-                </div>
-                <div class="terminal-file">/var/log/trex-sandbox.log</div>
-              </div>
-              <pre id="terminal-output" class="terminal-output"></pre>
-            </article>
-          </div>
+          <article class="terminal-shell">
+            <div class="terminal-shell-header">
+              <div class="terminal-dots"><span></span><span></span><span></span></div>
+              <div class="terminal-shell-meta" id="terminal-title">~ aegis · stream://task/not-loaded</div>
+              <div class="terminal-shell-file">task-execution.log</div>
+            </div>
+            <pre id="terminal-output" class="terminal-shell-output"></pre>
+          </article>
         </section>
       </main>
     </div>

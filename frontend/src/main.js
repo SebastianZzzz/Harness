@@ -1,768 +1,912 @@
 import "./styles/dashboard.css";
 
-const state = {
-  activeNav: "dashboard",
-  searchQuery: "",
-  secureMode: true,
-  autoRefresh: true,
-  approvalStatus: "high",
-  editingPrompt: false,
-  rangeIndex: 1,
-  rangeLabels: ["Last 7 Days", "Last 30 Days", "Last 90 Days"],
-  promptId: "PRMP-8824-B",
-  promptSections: [
-    {
-      title: "Role Definition",
-      lines: [
-        "You are AegisHarness, an agentic compiler responsible for turning product intent into secure repository changes.",
-      ],
-    },
-    {
-      title: "Core Objectives",
-      lines: [
-        "1. Translate natural-language requirements into structured implementation plans.",
-        "2. Collect repository context before generating code or running tools.",
-        "3. Route execution to the most cost-effective model that satisfies risk and latency constraints.",
-      ],
-    },
-    {
-      title: "Constraints & Safety Guardrails",
-      lines: [
-        "Do NOT modify files outside the declared workspace scope.",
-        "Do NOT execute destructive commands without explicit approval and rollback notes.",
-        "Prefer narrow command escalation. Avoid broad unrestricted shell access whenever a scoped action is enough.",
-        "Do NOT ignore sandbox feedback; fold failed review output back into the next generation step.",
-      ],
-      flaggedIndex: 2,
-    },
-    {
-      title: "Input Contract",
-      lines: [
-        "Expect prompt intent, similar repositories, historical bug constraints, and human edits before code generation.",
-      ],
-    },
-    {
-      title: "Output Structure",
-      lines: [
-        "Return a structured execution packet containing the prompt summary, proposed patch, validation plan, and post-run log summary.",
-      ],
-    },
-  ],
-  approvalRisks: [
-    {
-      title: "Loose Escalation Constraint",
-      copy: "The prompt allows broad shell escalation language without forcing command-level scope or rollback criteria.",
-      tags: ["Line 11", "Compliance: Internal", "High Severity"],
-      severity: "high",
-    },
-    {
-      title: "Missing Failure Rollback Step",
-      copy: "No explicit instruction tells the agent how to restore the workspace if sandbox validation fails after patch application.",
-      tags: ["UX Reliability", "Stage 5", "Medium"],
-      severity: "medium",
-    },
-  ],
-  routingMetrics: {
-    "Last 7 Days": {
-      value: "$11.6k",
-      delta: "↗ +8.4% vs previous period",
-      bars: [18, 28, 41, 56, 34, 16],
-      legend: [
-        { label: "Low (Llama 3 8B)", color: "#cec5b8" },
-        { label: "Mid (Claude 3.5 Haiku)", color: "#9c9387" },
-        { label: "High (GPT-4o)", color: "#3b342d" },
-      ],
-      dispatch: [
-        { name: "Claude 3.5 Sonnet", share: 38, requests: "78k Requests", latency: "Avg Latency: 760ms" },
-        { name: "GPT-4o", share: 35, requests: "64k Requests", latency: "Avg Latency: 1.1s" },
-        { name: "Llama 3 70B (Local)", share: 27, requests: "52k Requests", latency: "Avg Latency: 290ms" },
-      ],
-    },
-    "Last 30 Days": {
-      value: "$42.8k",
-      delta: "↗ +14.2% vs previous period",
-      bars: [14, 23, 37, 49, 26, 9],
-      legend: [
-        { label: "Low (Llama 3 8B)", color: "#cec5b8" },
-        { label: "Mid (Claude 3.5 Haiku)", color: "#9c9387" },
-        { label: "High (GPT-4o)", color: "#3b342d" },
-      ],
-      dispatch: [
-        { name: "Claude 3.5 Sonnet", share: 45, requests: "245k Requests", latency: "Avg Latency: 840ms" },
-        { name: "GPT-4o", share: 32, requests: "174k Requests", latency: "Avg Latency: 1.2s" },
-        { name: "Llama 3 70B (Local)", share: 23, requests: "125k Requests", latency: "Avg Latency: 320ms" },
-      ],
-    },
-    "Last 90 Days": {
-      value: "$119.3k",
-      delta: "↗ +19.6% vs previous period",
-      bars: [10, 18, 29, 44, 32, 18],
-      legend: [
-        { label: "Low (Llama 3 8B)", color: "#cec5b8" },
-        { label: "Mid (Claude 3.5 Haiku)", color: "#9c9387" },
-        { label: "High (GPT-4o)", color: "#3b342d" },
-      ],
-      dispatch: [
-        { name: "Claude 3.5 Sonnet", share: 43, requests: "702k Requests", latency: "Avg Latency: 880ms" },
-        { name: "GPT-4o", share: 29, requests: "514k Requests", latency: "Avg Latency: 1.3s" },
-        { name: "Llama 3 70B (Local)", share: 28, requests: "468k Requests", latency: "Avg Latency: 340ms" },
-      ],
-    },
+const STORAGE_KEY = "aegis.activeTaskId";
+const TASK_ENDPOINT = "/api/v1/tasks";
+const HEALTH_ENDPOINT = "/health";
+const TARGET_REPO = "AegisHarness-Demo";
+
+const PHASES = [
+  {
+    key: "1_INTENT_PARSING",
+    step: "01",
+    title: "Intake",
+    copy: "Parse the request into a structured prompt skeleton.",
+    view: "workflow",
   },
-  routingPreview: `import { ClodRouter } from "@aegis/clod-router";
+  {
+    key: "2_PRECHECK_GREPTILE",
+    step: "02",
+    title: "Context fetch",
+    copy: "Search for similar repos and extract constraints.",
+    view: "workflow",
+  },
+  {
+    key: "3_HUMAN_IN_THE_LOOP",
+    step: "03",
+    title: "Approval",
+    copy: "Reviewer confirms the structured prompt is safe.",
+    view: "approval",
+  },
+  {
+    key: "4_COMPUTE_ROUTING",
+    step: "04",
+    title: "Code gen",
+    copy: "Model writes the implementation against constraints.",
+    view: "output",
+  },
+  {
+    key: "5_SANDBOX_TESTING",
+    step: "05",
+    title: "Sandbox",
+    copy: "Run, review, retry up to 3x until checks pass.",
+    view: "logs",
+  },
+];
 
-const router = new ClodRouter({
-  strategy: "cost-optimized",
-  fallbackModel: "gpt-4o",
-  guardrails: ["sandbox_review", "policy_constraints", "human_override"],
-});
+const EMPTY_TASK = {
+  id: "",
+  original_prompt: "",
+  structured_prompt: "",
+  bug_list_constraints: [],
+  current_phase: "1_INTENT_PARSING",
+  search_provider: "github",
+  difficulty_score: null,
+  selected_model: "",
+  generated_code: "",
+  sandbox_iterations: 0,
+  max_iterations: 3,
+  created_at: "",
+  updated_at: "",
+};
 
-router.route({
-  if: ({ complexityScore, tokens }) => complexityScore < 0.30 && tokens < 1000,
-  target: "llama-3.1-8b-local",
-  reason: "Low complexity, low latency path",
-});
-
-router.route({
-  if: ({ complexityScore, policyRisk }) => complexityScore < 0.68 && policyRisk < 0.45,
-  target: "claude-3.5-sonnet",
-  reason: "Balanced throughput with strong reasoning",
-});
-
-router.route({
-  if: ({ complexityScore, policyRisk, sandboxRetries }) =>
-    complexityScore >= 0.68 || policyRisk >= 0.45 || sandboxRetries > 0,
-  target: "gpt-4o",
-  reason: "Escalate for high-risk or recovery-bound workloads",
-});`,
-  stages: [
-    {
-      id: "stage1",
-      index: "Stage 1",
-      name: "Trynia Intent",
-      copy: "Intent parsed with repository context attached.",
-      status: "Active",
-      progress: 88,
-      open: "dashboard",
-      icon: "intent",
-    },
-    {
-      id: "stage2",
-      index: "Stage 2",
-      name: "Greptile Risk",
-      copy: "Constraint extraction and policy scan in motion.",
-      status: "Processing",
-      progress: 62,
-      open: "dashboard",
-      icon: "shield",
-    },
-    {
-      id: "stage3",
-      index: "Stage 3",
-      name: "HITL Approval",
-      copy: "Waiting for human validation before execution.",
-      status: "Pending",
-      progress: 18,
-      open: "approval",
-      icon: "document",
-    },
-    {
-      id: "stage4",
-      index: "Stage 4",
-      name: "Clod Routing",
-      copy: "Routing thresholds idle until approval clears.",
-      status: "Waiting",
-      progress: 0,
-      open: "routing",
-      icon: "routing",
-    },
-    {
-      id: "stage5",
-      index: "Stage 5",
-      name: "Sandbox Healing",
-      copy: "TREX container loop queued for generated patch review.",
-      status: "Waiting",
-      progress: 0,
-      open: "logs",
-      icon: "clock",
-    },
-  ],
-  timeline: [
-    {
-      title: "Risk Flagged: Escalation Prompt Drift",
-      copy: "Greptile identified an overly broad shell escalation clause in the generated system prompt.",
-      tags: ["Stage 2", "Action Required"],
-      time: "10:42 AM",
-    },
-    {
-      title: "Intent Parsed Successfully",
-      copy: "Trynia aligned the request to repository-aware implementation with 98% confidence.",
-      tags: ["Stage 1", "Cleared"],
-      time: "10:41 AM",
-    },
-    {
-      title: "Constraint Pack Refreshed",
-      copy: "Historical bug signatures and security exclusions were attached to the execution packet.",
-      tags: ["Stage 2", "Guardrails"],
-      time: "10:38 AM",
-    },
-    {
-      title: "Dynamic Route Updated",
-      copy: "Clod pre-warmed the fallback premium cluster after detecting rising sandbox retry probability.",
-      tags: ["Stage 4", "Queued"],
-      time: "10:35 AM",
-    },
-  ],
-  healingCycles: [
-    {
-      label: "Cycle 01 / Pass",
-      time: "10:42:01 AM",
-      copy: "Dependency injection resolved. Minor memory leak detected and patched dynamically.",
-    },
-    {
-      label: "Cycle 02 / Pass",
-      time: "10:45:22 AM",
-      copy: "Threat deadlock averted. Sandbox state rolled back to checkpoint Alpha for re-execution.",
-    },
-    {
-      label: "Cycle 03 / Active",
-      time: "10:48:15 AM",
-      copy: "Attempting to sanitize malicious input string bypassing regex filter. Applying heuristic masks.",
-    },
-  ],
-  terminalLines: [
-    { tone: "muted", text: "[10:48:10.001] INFO: Initializing sandbox container v4.2.1" },
-    { tone: "muted", text: "[10:48:10.045] INFO: Mounting volumes... OK." },
-    { tone: "muted", text: "[10:48:11.200] INFO: Establishing network isolation bridge." },
-    { tone: "muted", text: "[10:48:12.553] WARN: Deprecated flag 'allow_unsafe_eval' detected in config. Ignored." },
-    { tone: "", text: "[10:48:14.102] EXEC: Invoking user payload routine." },
-    { tone: "", text: "  >> Analyzing AST stream..." },
-    { tone: "", text: "  >> Identifying potential deep-eval nodes..." },
-    { tone: "", text: "  >> Sandboxing memory allocations (limit: 512MB)" },
-    { tone: "alert", text: "[10:48:15.001] ALERT: Anomalous string pattern detected. Possible SQLi heuristic match." },
-    { tone: "alert", text: "[10:48:15.050] TRIG: Initiating Self-Healing Cycle 03." },
-    { tone: "muted", text: "[10:48:15.100] INFO: Halting execution. Snapshotting state to /tmp/trx_snap_03." },
-    { tone: "", text: "  >> Applying masking filter to payload line 42." },
-    { tone: "", text: "  >> Recompiling..." },
-    { tone: "", text: "[10:48:16.882] AWAIT: Verifying sanitized payload against rule engine..." },
-  ],
+const state = {
+  activeView: "workflow",
+  backendConnected: false,
+  autoRefresh: true,
+  tailFollow: true,
+  loading: false,
+  ws: null,
+  task: { ...EMPTY_TASK },
+  draftPrompt: "",
+  draftSearchProvider: "github",
+  taskLookup: "",
+  logs: [],
+  stream: [],
+  prUrl: "",
+  phaseDurations: {},
 };
 
 const els = {};
-let refreshTimer;
+let refreshTimer = null;
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   captureElements();
   bindEvents();
   render();
-  refreshTimer = window.setInterval(tickAutoRefresh, 3200);
+  await checkBackendHealth();
+  await hydrateStoredTask();
+  refreshTimer = window.setInterval(() => {
+    if (state.autoRefresh && state.task.id) {
+      void loadTask(state.task.id, { silent: true });
+    }
+  }, 5000);
 });
 
 function captureElements() {
   els.views = {
-    dashboard: document.getElementById("view-dashboard"),
-    workflows: document.getElementById("view-workflows"),
+    workflow: document.getElementById("view-workflow"),
+    approval: document.getElementById("view-approval"),
+    output: document.getElementById("view-output"),
     logs: document.getElementById("view-logs"),
   };
-  els.search = document.getElementById("global-search");
-  els.stageCards = document.getElementById("stage-cards");
-  els.timelineFeed = document.getElementById("timeline-feed");
+
+  els.taskIdInput = document.getElementById("task-id-input");
+  els.taskRequest = document.getElementById("task-request");
+  els.searchProvider = document.getElementById("search-provider");
+  els.backendStatusPill = document.getElementById("backend-status-pill");
+  els.backendStatusDot = document.getElementById("backend-status-dot");
+  els.backendStatusLabel = document.getElementById("backend-status-label");
+  els.workflowCount = document.getElementById("workflow-count");
+  els.logsLiveIndicator = document.getElementById("logs-live-indicator");
+
+  els.workflowPhaseChip = document.getElementById("workflow-phase-chip");
+  els.retryChip = document.getElementById("retry-chip");
+  els.snapshotPhaseTitle = document.getElementById("snapshot-phase-title");
+  els.snapshotPhaseCopy = document.getElementById("snapshot-phase-copy");
+  els.snapshotTaskId = document.getElementById("snapshot-task-id");
+  els.snapshotProvider = document.getElementById("snapshot-provider");
+  els.snapshotModel = document.getElementById("snapshot-model");
+  els.snapshotConstraints = document.getElementById("snapshot-constraints");
+  els.snapshotUpdated = document.getElementById("snapshot-updated");
+  els.taskHealthChip = document.getElementById("task-health-chip");
+  els.phaseGrid = document.getElementById("phase-grid");
+
+  els.promptTitle = document.getElementById("prompt-title");
+  els.promptMetaChip = document.getElementById("prompt-meta-chip");
   els.promptSurface = document.getElementById("prompt-surface");
-  els.riskList = document.getElementById("risk-list");
-  els.promptId = document.getElementById("prompt-id-badge");
-  els.approvalRiskPill = document.getElementById("approval-risk-pill");
-  els.efficiencyValue = document.getElementById("efficiency-value");
-  els.efficiencyDelta = document.getElementById("efficiency-delta");
-  els.dispatchList = document.getElementById("dispatch-list");
-  els.chart = document.getElementById("complexity-chart");
-  els.legend = document.getElementById("complexity-legend");
-  els.routingCode = document.getElementById("routing-code");
-  els.rangeButton = document.getElementById("cycle-range");
-  els.healingList = document.getElementById("healing-list");
+  els.reviewList = document.getElementById("review-list");
+  els.constraintTitle = document.getElementById("constraint-title");
+  els.constraintSummaryChip = document.getElementById("constraint-summary-chip");
+  els.approvalHeaderChip = document.getElementById("approval-header-chip");
+  els.approvalEditor = document.getElementById("approval-editor");
+
+  els.outputStatusChip = document.getElementById("output-status-chip");
+  els.outputModel = document.getElementById("output-model");
+  els.outputModelCopy = document.getElementById("output-model-copy");
+  els.outputPhase = document.getElementById("output-phase");
+  els.outputPhaseCopy = document.getElementById("output-phase-copy");
+  els.outputIterations = document.getElementById("output-iterations");
+  els.outputIterationsBar = document.getElementById("output-iterations-bar");
+  els.outputProvider = document.getElementById("output-provider");
+  els.outputProviderCopy = document.getElementById("output-provider-copy");
+  els.deliveryState = document.getElementById("delivery-state");
+  els.outputTaskId = document.getElementById("output-task-id");
+  els.outputConstraintTotal = document.getElementById("output-constraint-total");
+  els.outputSandbox = document.getElementById("output-sandbox");
+  els.outputBranch = document.getElementById("output-branch");
+  els.outputUpdated = document.getElementById("output-updated");
+  els.phaseLogList = document.getElementById("phase-log-list");
+  els.generatedCode = document.getElementById("generated-code");
+  els.viewDiff = document.getElementById("view-diff");
+  els.openPr = document.getElementById("open-pr");
+
+  els.logsStatusTitle = document.getElementById("logs-status-title");
+  els.logsHealthChip = document.getElementById("logs-health-chip");
+  els.logsTaskId = document.getElementById("logs-task-id");
+  els.logsProvider = document.getElementById("logs-provider");
+  els.logsIterations = document.getElementById("logs-iterations");
+  els.logsUpdated = document.getElementById("logs-updated");
+  els.logsRepoTitle = document.getElementById("logs-repo-title");
+  els.logsBranchChip = document.getElementById("logs-branch-chip");
+  els.logsModel = document.getElementById("logs-model");
+  els.logsConstraintCount = document.getElementById("logs-constraint-count");
+  els.logsPrStatus = document.getElementById("logs-pr-status");
+  els.logsSandbox = document.getElementById("logs-sandbox");
+  els.eventMixTitle = document.getElementById("event-mix-title");
+  els.mixInfoBar = document.getElementById("mix-info-bar");
+  els.mixOkBar = document.getElementById("mix-ok-bar");
+  els.mixReviewBar = document.getElementById("mix-review-bar");
+  els.mixErrorBar = document.getElementById("mix-error-bar");
+  els.mixInfoCount = document.getElementById("mix-info-count");
+  els.mixOkCount = document.getElementById("mix-ok-count");
+  els.mixReviewCount = document.getElementById("mix-review-count");
+  els.mixErrorCount = document.getElementById("mix-error-count");
+  els.terminalTitle = document.getElementById("terminal-title");
   els.terminalOutput = document.getElementById("terminal-output");
-  els.systemLoadValue = document.getElementById("system-load-value");
-  els.systemLoadDelta = document.getElementById("system-load-delta");
-  els.blockedRisksValue = document.getElementById("blocked-risks-value");
-  els.blockedRisksDelta = document.getElementById("blocked-risks-delta");
-  els.secureToggle = document.getElementById("toggle-secure-mode");
-  els.refreshToggle = document.getElementById("toggle-auto-refresh");
-  els.sandboxState = document.getElementById("sandbox-state");
-  els.sandboxSession = document.getElementById("sandbox-session");
-  els.sandboxEnv = document.getElementById("sandbox-env");
-  els.sandboxUptime = document.getElementById("sandbox-uptime");
-  els.sandboxOrb = document.getElementById("sandbox-orb");
-  els.scanInjection = document.getElementById("scan-injection");
-  els.scanAuth = document.getElementById("scan-auth");
-  els.scanExfiltration = document.getElementById("scan-exfiltration");
+  els.pipelineTotalDuration = document.getElementById("pipeline-total-duration");
+  els.pipelineIterationStatus = document.getElementById("pipeline-iteration-status");
 }
 
 function bindEvents() {
-  document.querySelectorAll("[data-nav-target]").forEach((button) => {
-    button.addEventListener("click", () => {
-      navigate(button.dataset.navTarget);
-    });
+  document.querySelectorAll("[data-view]").forEach((button) => {
+    button.addEventListener("click", () => setActiveView(button.dataset.view));
   });
 
-  els.search.addEventListener("input", (event) => {
-    state.searchQuery = event.target.value.trim().toLowerCase();
-    render();
+  els.taskIdInput.addEventListener("input", (event) => {
+    state.taskLookup = event.target.value.trim();
   });
 
-  document.getElementById("edit-prompt").addEventListener("click", togglePromptEditing);
-  document.getElementById("approve-prompt").addEventListener("click", approvePrompt);
-  document.getElementById("reject-prompt").addEventListener("click", rejectPrompt);
-  document.getElementById("bypass-hitl").addEventListener("click", bypassApproval);
-  document.getElementById("force-sandbox").addEventListener("click", forceSandboxRefresh);
-  document.getElementById("cycle-range").addEventListener("click", cycleRange);
-  document.getElementById("copy-routing-code").addEventListener("click", copyRoutingCode);
-  document.getElementById("toggle-secure-mode").addEventListener("click", toggleSecureMode);
+  els.taskRequest.addEventListener("input", (event) => {
+    state.draftPrompt = event.target.value;
+  });
+
+  els.searchProvider.addEventListener("change", (event) => {
+    state.draftSearchProvider = event.target.value;
+  });
+
+  document.getElementById("copy-task-id").addEventListener("click", copyTaskId);
+  document.getElementById("refresh-task").addEventListener("click", refreshTask);
+  document.getElementById("load-task").addEventListener("click", () => {
+    if (state.taskLookup) {
+      void loadTask(state.taskLookup, { silent: false });
+    }
+  });
+  document.getElementById("create-task").addEventListener("click", createTask);
+  document.getElementById("approve-task-header").addEventListener("click", () => void submitApproval(true));
+  document.getElementById("reject-task-header").addEventListener("click", () => void submitApproval(false));
+  document.getElementById("copy-generated-code").addEventListener("click", copyGeneratedCode);
+  document.getElementById("view-diff").addEventListener("click", openDiff);
+  document.getElementById("open-pr").addEventListener("click", openPr);
   document.getElementById("toggle-auto-refresh").addEventListener("click", toggleAutoRefresh);
-  document.getElementById("export-dashboard-log").addEventListener("click", exportDashboardLog);
-  document.getElementById("export-routing-report").addEventListener("click", exportRoutingReport);
-  document.getElementById("export-scan-report").addEventListener("click", exportScanReport);
+  document.getElementById("export-log").addEventListener("click", exportLogs);
+  document.getElementById("toggle-tail-follow").addEventListener("click", toggleTailFollow);
 }
 
-function navigate(target) {
-  state.activeNav = target;
-  render();
+async function checkBackendHealth() {
+  try {
+    const response = await fetch(HEALTH_ENDPOINT);
+    state.backendConnected = response.ok;
+  } catch {
+    state.backendConnected = false;
+  }
+  renderBackendStatus();
+}
+
+async function hydrateStoredTask() {
+  const storedTaskId = localStorage.getItem(STORAGE_KEY);
+  if (!storedTaskId) {
+    render();
+    return;
+  }
+  state.taskLookup = storedTaskId;
+  els.taskIdInput.value = storedTaskId;
+  await loadTask(storedTaskId, { silent: true });
+}
+
+function setActiveView(view) {
+  state.activeView = view;
+  renderViews();
 }
 
 function render() {
-  renderNavState();
-  renderStages();
-  renderTimeline();
+  renderViews();
+  renderBackendStatus();
+  renderSidebarState();
+  renderTaskControls();
+  renderWorkflow();
   renderApproval();
-  renderRouting();
+  renderOutput();
   renderLogs();
 }
 
-function renderNavState() {
-  const visibleView = state.activeNav === "approval" || state.activeNav === "routing" ? "workflows" : state.activeNav;
+function renderViews() {
   Object.entries(els.views).forEach(([key, node]) => {
-    node.classList.toggle("is-active", key === visibleView);
+    node.classList.toggle("is-active", key === state.activeView);
   });
-
-  document.querySelectorAll(".workflow-panel").forEach((node) => {
-    const active = node.id === (state.activeNav === "routing" ? "workflow-routing" : "workflow-approval");
-    node.classList.toggle("is-active", active);
-  });
-
-  document.querySelectorAll(".rail-action").forEach((button) => {
-    const navTarget = button.dataset.navTarget;
-    const active = navTarget && navTarget === state.activeNav;
-    button.classList.toggle("is-active", active);
-  });
-
-  els.search.placeholder =
-    state.activeNav === "logs"
-      ? "Search logs..."
-      : state.activeNav === "approval" || state.activeNav === "routing"
-        ? "Search workflows..."
-        : "Search insights...";
-}
-
-function renderStages() {
-  els.stageCards.innerHTML = state.stages
-    .map((stage) => {
-      const clickable = stage.open === "approval" || stage.open === "routing" || stage.open === "logs";
-      const buttonAttrs = clickable
-        ? `data-stage-open="${stage.open}" class="stage-card is-clickable"`
-        : `class="stage-card"`;
-      return `
-        <button type="button" ${buttonAttrs}>
-          <div class="stage-card-top">
-            <span class="stage-icon">${stageIcon(stage.icon)}</span>
-            <span class="status-pill">${escapeHtml(stage.status)}</span>
-          </div>
-          <div class="stage-index">${escapeHtml(stage.index)}</div>
-          <div class="stage-name">${escapeHtml(stage.name)}</div>
-          <div class="stage-copy">${escapeHtml(stage.copy)}</div>
-          <div class="stage-progress"><span style="width:${stage.progress}%"></span></div>
-        </button>
-      `;
-    })
-    .join("");
-
-  els.stageCards.querySelectorAll("[data-stage-open]").forEach((button) => {
-    button.addEventListener("click", () => {
-      navigate(button.dataset.stageOpen);
-    });
+  document.querySelectorAll(".sidebar-link").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.view === state.activeView);
   });
 }
 
-function renderTimeline() {
-  const items = filterItems(state.timeline, (item) => [item.title, item.copy, item.tags.join(" "), item.time]);
-  els.timelineFeed.innerHTML = items.length
-    ? items
-        .map(
-          (item) => `
-            <article class="timeline-item">
-              <span class="timeline-dot"></span>
-              <div class="timeline-body">
-                <div class="timeline-title">${escapeHtml(item.title)}</div>
-                <p class="timeline-copy">${escapeHtml(item.copy)}</p>
-                <div class="timeline-tags">
-                  ${item.tags.map((tag) => `<span class="event-badge">${escapeHtml(tag)}</span>`).join("")}
-                </div>
-              </div>
-              <div class="timeline-time">${escapeHtml(item.time)}</div>
-            </article>
-          `,
-        )
-        .join("")
-    : `<div class="empty-state">No stream events match the current search.</div>`;
+function renderBackendStatus() {
+  els.backendStatusPill.classList.toggle("is-offline", !state.backendConnected);
+  els.backendStatusDot.classList.toggle("is-offline", !state.backendConnected);
+  els.backendStatusLabel.textContent = state.backendConnected ? "Backend connected" : "Backend unavailable";
+}
+
+function renderSidebarState() {
+  els.workflowCount.textContent = state.task.id ? "1" : "0";
+  els.logsLiveIndicator.textContent = state.ws && state.ws.readyState === WebSocket.OPEN ? "live" : "idle";
+  els.logsLiveIndicator.classList.toggle("is-live", state.ws && state.ws.readyState === WebSocket.OPEN);
+}
+
+function renderTaskControls() {
+  if (document.activeElement !== els.taskIdInput) {
+    els.taskIdInput.value = state.taskLookup;
+  }
+  if (document.activeElement !== els.taskRequest) {
+    els.taskRequest.value = state.draftPrompt;
+  }
+  els.searchProvider.value = state.draftSearchProvider;
+}
+
+function renderWorkflow() {
+  els.workflowPhaseChip.textContent = workflowPhaseLabel();
+  els.retryChip.textContent = `${state.task.max_iterations} / retries`;
+  els.snapshotPhaseTitle.textContent = workflowPhaseShort();
+  els.snapshotPhaseCopy.textContent = workflowPhaseCopy();
+  els.snapshotTaskId.textContent = state.task.id ? compactTaskId(state.task.id) : "Not loaded";
+  els.snapshotProvider.textContent = formatProvider(state.task.search_provider);
+  els.snapshotModel.textContent = state.task.selected_model || "Pending";
+  els.snapshotConstraints.textContent = `${state.task.bug_list_constraints.length} active`;
+  els.snapshotUpdated.textContent = formatTime(state.task.updated_at);
+  els.taskHealthChip.textContent = taskHealthLabel();
+  els.taskHealthChip.className = healthChipClass();
+  els.pipelineIterationStatus.textContent = `iter ${state.task.sandbox_iterations} / ${state.task.max_iterations}`;
+  els.pipelineTotalDuration.textContent = `Duration ${totalDurationLabel()}`;
+
+  els.phaseGrid.innerHTML = PHASES.map((phase, index) => {
+    const status = phaseStatus(phase.key);
+    const active = state.activeView === phase.view;
+    return `
+      <button class="phase-card ${active ? "phase-card--active" : ""}" type="button" data-phase-view="${phase.view}">
+        <div class="phase-card-head">
+          <span class="phase-step">${phase.step}</span>
+          <span class="phase-status ${phaseStatusClass(status)}">${status}</span>
+        </div>
+        <div class="phase-card-title">${escapeHtml(phase.title)}</div>
+        <div class="phase-card-copy">${escapeHtml(phase.copy)}</div>
+        <div class="phase-progress"><span style="width:${phaseProgress(index)}%"></span></div>
+        <div class="phase-meta">
+          <span>Latency</span>
+          <strong>${phaseLatency(phase.key)}</strong>
+        </div>
+      </button>
+    `;
+  }).join("");
+
+  document.querySelectorAll("[data-phase-view]").forEach((button) => {
+    button.addEventListener("click", () => setActiveView(button.dataset.phaseView));
+  });
 }
 
 function renderApproval() {
-  els.promptId.textContent = state.promptId;
-  els.approvalRiskPill.textContent =
-    state.approvalStatus === "approved"
-      ? "Approved"
-      : state.approvalStatus === "rejected"
-        ? "Rejected"
-        : "High Risk";
-  els.approvalRiskPill.className =
-    state.approvalStatus === "approved"
-      ? "severity-pill severity-pill--approved"
-      : state.approvalStatus === "rejected"
-        ? "severity-pill severity-pill--rejected"
-        : "severity-pill severity-pill--high";
-
-  if (state.editingPrompt) {
-    els.promptSurface.innerHTML = `<textarea id="prompt-editor" class="prompt-editor">${escapeHtml(promptTextFromSections())}</textarea>`;
-  } else {
-    const filteredSections = state.promptSections
-      .map((section) => ({
-        ...section,
-        lines: section.lines.filter((line) => matchesQuery(`${section.title} ${line}`)),
-      }))
-      .filter((section) => section.lines.length);
-
-    els.promptSurface.innerHTML = filteredSections.length
-      ? `<div class="prompt-reading">
-          ${filteredSections
-            .map(
-              (section) => `
-                <section>
-                  <h3 class="prompt-section-title"># ${escapeHtml(section.title)}</h3>
-                  <ul class="prompt-lines">
-                    ${section.lines
-                      .map((line, index) => {
-                        const originalIndex = state.promptSections.find((entry) => entry.title === section.title).lines.indexOf(line);
-                        const flagged = originalIndex === section.flaggedIndex ? "is-flagged" : "";
-                        return `<li class="prompt-line ${flagged}">${escapeHtml(line)}</li>`;
-                      })
-                      .join("")}
-                  </ul>
-                </section>
-              `,
-            )
-            .join("")}
-        </div>`
-      : `<div class="empty-state">No prompt clauses match the current search.</div>`;
+  const constraints = state.task.bug_list_constraints || [];
+  els.approvalHeaderChip.textContent = approvalHeaderText();
+  els.approvalHeaderChip.className = approvalHeaderClass();
+  els.promptTitle.textContent = "Generated by planner · Phase 2";
+  els.promptMetaChip.textContent = `${formatProvider(state.task.search_provider)} · similar-repo`;
+  els.constraintTitle.textContent = `Constraints · ${constraints.length} active`;
+  els.constraintSummaryChip.textContent = constraints.length
+    ? (phaseIndex(state.task.current_phase) >= phaseIndex("4_COMPUTE_ROUTING") ? "all passed" : "review ready")
+    : "waiting";
+  els.promptSurface.innerHTML = renderPromptDocument(state.task.structured_prompt || state.task.original_prompt);
+  if (document.activeElement !== els.approvalEditor) {
+    els.approvalEditor.value = state.task.structured_prompt || "";
   }
 
-  const risks = filterItems(state.approvalRisks, (item) => [item.title, item.copy, item.tags.join(" ")]);
-  els.riskList.innerHTML = risks.length
-    ? risks
-        .map(
-          (risk) => `
-            <article class="risk-item ${risk.severity === "high" ? "is-high" : ""}">
-              <div class="risk-header">
-                <div class="risk-title">${escapeHtml(risk.title)}</div>
-                <span class="status-pill">${escapeHtml(risk.severity === "high" ? "Flagged" : "Advisory")}</span>
-              </div>
-              <div class="risk-copy">${escapeHtml(risk.copy)}</div>
-              <div class="risk-foot">
-                ${risk.tags.map((tag) => `<span class="risk-chip">${escapeHtml(tag)}</span>`).join("")}
-              </div>
-            </article>
-          `,
-        )
-        .join("")
-    : `<div class="empty-state">No approval risks match the current search.</div>`;
+  els.reviewList.innerHTML = constraints.length
+    ? constraints.map((constraint, index) => `
+        <article class="checklist-item">
+          <div class="checklist-mark ${phaseIndex(state.task.current_phase) >= phaseIndex("4_COMPUTE_ROUTING") ? "checklist-mark--filled" : ""}">
+            ${phaseIndex(state.task.current_phase) >= phaseIndex("4_COMPUTE_ROUTING") ? "✓" : ""}
+          </div>
+          <div class="checklist-copy">${escapeHtml(constraint)}</div>
+          <div class="checklist-pill">${phaseIndex(state.task.current_phase) >= phaseIndex("4_COMPUTE_ROUTING") ? "PASS" : "ACTIVE"}</div>
+        </article>
+      `).join("")
+    : `<div class="empty-state">No constraint pack is available yet.</div>`;
 }
 
-function renderRouting() {
-  const range = state.rangeLabels[state.rangeIndex];
-  const metrics = state.routingMetrics[range];
-  els.rangeButton.textContent = range;
-  els.efficiencyValue.textContent = metrics.value;
-  els.efficiencyDelta.textContent = metrics.delta;
+function renderOutput() {
+  els.outputStatusChip.textContent = outputStatusLabel();
+  els.outputStatusChip.className = outputStatusClass();
+  els.outputModel.textContent = state.task.selected_model || "Pending";
+  els.outputModelCopy.textContent = state.task.selected_model
+    ? "Picked during Phase 4 routing."
+    : "No model has been selected yet.";
+  els.outputPhase.textContent = outputPhaseLabel();
+  els.outputPhaseCopy.textContent = phaseDescription(state.task.current_phase);
+  els.outputIterations.textContent = `${state.task.sandbox_iterations} / ${state.task.max_iterations}`;
+  els.outputIterationsBar.style.width = `${iterationProgress()}%`;
+  els.outputProvider.textContent = formatProvider(state.task.search_provider);
+  els.outputProviderCopy.textContent = state.task.id ? "Context gathered from similar repositories." : "No similar repositories loaded yet.";
+  els.deliveryState.textContent = state.task.generated_code ? "Code generated" : "Awaiting code";
+  els.outputTaskId.textContent = state.task.id ? compactTaskId(state.task.id) : "Not loaded";
+  els.outputConstraintTotal.textContent = String(state.task.bug_list_constraints.length);
+  els.outputSandbox.textContent = TARGET_REPO;
+  els.outputBranch.textContent = prBranchLabel();
+  els.outputUpdated.textContent = formatTime(state.task.updated_at);
+  els.generatedCode.textContent = state.task.generated_code || "# Generated code appears here after Phase 4.";
 
-  const dispatchItems = filterItems(metrics.dispatch, (item) => [item.name, item.requests, item.latency]);
-  els.dispatchList.innerHTML = dispatchItems
-    .map(
-      (item) => `
-        <article class="dispatch-item">
-          <div class="dispatch-meta">
-            <div class="dispatch-name">${escapeHtml(item.name)}</div>
-            <div class="progress-track"><span style="width:${item.share}%"></span></div>
-            <div class="dispatch-stats">
-              <span>${escapeHtml(item.requests)}</span>
-              <span>${escapeHtml(item.latency)}</span>
-            </div>
-          </div>
-          <div class="dispatch-usage">${item.share}%</div>
-        </article>
-      `,
-    )
-    .join("");
+  els.viewDiff.disabled = !state.prUrl;
+  els.openPr.disabled = !state.prUrl;
 
-  els.chart.innerHTML = metrics.bars
-    .map((value, index) => {
-      const color = index < 2 ? "#d1c8bb" : index < 4 ? "#9f968a" : "#3c342d";
-      return `<div class="complexity-bar"><span style="--bar-height:${value}%;--bar-color:${color}"></span></div>`;
-    })
-    .join("");
-
-  els.legend.innerHTML = metrics.legend
-    .map(
-      (item) => `
-        <span class="legend-item" style="color:${item.color}">
-          <span class="legend-dot"></span>${escapeHtml(item.label)}
-        </span>
-      `,
-    )
-    .join("");
-
-  els.routingCode.textContent = matchesQuery(state.routingPreview) || !state.searchQuery ? state.routingPreview : "// No routing preview lines match the current search.";
+  els.phaseLogList.innerHTML = phaseLogEntries().length
+    ? phaseLogEntries().map((entry) => `
+        <div class="phase-log-item">
+          <span>${escapeHtml(entry.time)}</span>
+          <strong>${escapeHtml(entry.text)}</strong>
+        </div>
+      `).join("")
+    : `<div class="empty-state">No phase log has been emitted yet.</div>`;
 }
 
 function renderLogs() {
-  const injection = state.secureMode ? 0 : 1;
-  const auth = state.secureMode ? 0 : 1;
-  const exfiltration = state.secureMode ? 1 : 3;
+  els.logsStatusTitle.textContent = logsStatusTitle();
+  els.logsHealthChip.textContent = taskHealthLabel();
+  els.logsHealthChip.className = healthChipClass();
+  els.logsTaskId.textContent = state.task.id ? compactTaskId(state.task.id) : "Not loaded";
+  els.logsProvider.textContent = formatProvider(state.task.search_provider);
+  els.logsIterations.textContent = `${state.task.sandbox_iterations} / ${state.task.max_iterations}`;
+  els.logsUpdated.textContent = formatTime(state.task.updated_at);
+  els.logsRepoTitle.textContent = TARGET_REPO;
+  els.logsBranchChip.textContent = prBranchLabel();
+  els.logsModel.textContent = state.task.selected_model || "Pending";
+  els.logsConstraintCount.textContent = String(state.task.bug_list_constraints.length);
+  els.logsPrStatus.textContent = state.prUrl ? "open" : "Not opened";
+  els.logsSandbox.textContent = TARGET_REPO;
+  els.terminalTitle.textContent = state.task.id ? `~ aegis · stream://task/${state.task.id.slice(0, 8)}` : "~ aegis · stream://task/not-loaded";
+  document.getElementById("toggle-auto-refresh").textContent = `Auto-refresh · ${state.autoRefresh ? "on" : "off"}`;
 
-  els.secureToggle.classList.toggle("is-active", state.secureMode);
-  els.refreshToggle.classList.toggle("is-active", state.autoRefresh);
-  els.secureToggle.setAttribute("aria-pressed", String(state.secureMode));
-  els.refreshToggle.setAttribute("aria-pressed", String(state.autoRefresh));
-  els.sandboxState.textContent = state.secureMode ? "Active Monitoring" : "Review Mode";
-  els.sandboxSession.textContent = state.secureMode ? "TRX-992-A" : "TRX-992-B";
-  els.sandboxEnv.textContent = state.secureMode ? "Isolated Container 04" : "Diagnostic Container";
-  els.sandboxUptime.textContent = state.secureMode ? "02:14:45" : "00:36:11";
-  els.sandboxOrb.style.borderColor = state.secureMode ? "rgba(47,41,35,0.2)" : "rgba(200,81,70,0.28)";
-  els.scanInjection.textContent = String(injection);
-  els.scanAuth.textContent = String(auth);
-  els.scanExfiltration.textContent = String(exfiltration);
+  const mix = eventMix();
+  els.eventMixTitle.textContent = `${mix.total} events`;
+  updateMixRow(els.mixInfoBar, els.mixInfoCount, mix.info, mix.total);
+  updateMixRow(els.mixOkBar, els.mixOkCount, mix.ok, mix.total);
+  updateMixRow(els.mixReviewBar, els.mixReviewCount, mix.review, mix.total);
+  updateMixRow(els.mixErrorBar, els.mixErrorCount, mix.error, mix.total);
 
-  const cycles = filterItems(state.healingCycles, (item) => [item.label, item.copy, item.time]);
-  els.healingList.innerHTML = cycles.length
-    ? cycles
-        .map(
-          (item) => `
-            <article class="cycle-item">
-              <div class="cycle-head">
-                <span class="cycle-label">${escapeHtml(item.label)}</span>
-                <span class="cycle-time">${escapeHtml(item.time)}</span>
-              </div>
-              <p class="cycle-copy">${escapeHtml(item.copy)}</p>
-            </article>
-          `,
-        )
-        .join("")
-    : `<div class="empty-state">No healing cycle entries match the current search.</div>`;
+  els.terminalOutput.innerHTML = state.logs.length
+    ? state.logs.map((entry) => `
+        <div class="terminal-line">
+          <span class="terminal-time">${escapeHtml(entry.time)}</span>
+          <span class="terminal-level terminal-level--${entry.levelClass}">${escapeHtml(entry.level)}</span>
+          <span class="terminal-message">${escapeHtml(entry.message)}</span>
+        </div>
+      `).join("")
+    : `<div class="empty-state">No execution logs yet.</div>`;
 
-  const lines = state.terminalLines.filter((line) => matchesQuery(line.text));
-  els.terminalOutput.innerHTML = lines.length
-    ? lines
-        .map((line) => `<div class="terminal-line ${line.tone ? `is-${line.tone}` : ""}">${escapeHtml(line.text)}</div>`)
-        .join("")
-    : `<div class="empty-state">No terminal lines match the current search.</div>`;
-
-  const systemLoad = state.approvalStatus === "approved" ? "31.2%" : "24.8%";
-  const blockedRisks = state.approvalStatus === "approved" ? "143" : state.approvalStatus === "rejected" ? "148" : "142";
-  els.systemLoadValue.textContent = systemLoad;
-  els.systemLoadDelta.textContent = state.approvalStatus === "approved" ? "↗ +4.1% during execution ramp" : "↘ -2.4% from last hour";
-  els.blockedRisksValue.textContent = blockedRisks;
-  els.blockedRisksDelta.textContent = state.approvalStatus === "rejected" ? "↗ +18 since yesterday" : "↗ +12 since yesterday";
+  if (state.tailFollow) {
+    requestAnimationFrame(() => {
+      els.terminalOutput.scrollTop = els.terminalOutput.scrollHeight;
+    });
+  }
 }
 
-function togglePromptEditing() {
-  if (state.editingPrompt) {
-    const editor = document.getElementById("prompt-editor");
-    if (editor) {
-      state.promptSections = parsePrompt(editor.value);
+async function createTask() {
+  const prompt = state.draftPrompt.trim();
+  if (!prompt || state.loading) {
+    return;
+  }
+
+  state.loading = true;
+  try {
+    const params = new URLSearchParams({
+      prompt,
+      search_provider: state.draftSearchProvider,
+    });
+    const response = await fetch(`${TASK_ENDPOINT}/?${params.toString()}`, { method: "POST" });
+    if (!response.ok) {
+      throw new Error(`Task creation failed with status ${response.status}`);
     }
+    const task = normalizeTask(await response.json());
+    applyTask(task);
+    state.backendConnected = true;
+    connectTaskSocket(task.id);
+    localStorage.setItem(STORAGE_KEY, task.id);
+    pushStream("Task created", "Planner accepted the request and started the workflow.", ["PHASE", "TASK"]);
+    pushLog(`Task ${task.id} created`, "INFO");
+    setActiveView("workflow");
+  } catch (error) {
+    state.backendConnected = false;
+    pushLog(error.message, "ERROR");
+  } finally {
+    state.loading = false;
+    render();
   }
-  state.editingPrompt = !state.editingPrompt;
-  document.getElementById("edit-prompt").textContent = state.editingPrompt ? "Save Prompt" : "Edit Prompt";
-  renderApproval();
 }
 
-function approvePrompt() {
-  if (state.editingPrompt) {
-    togglePromptEditing();
+async function refreshTask() {
+  if (!state.task.id) {
+    return;
   }
-  state.approvalStatus = "approved";
-  patchStage("stage1", { status: "Complete", progress: 100, copy: "Intent packet approved and frozen for execution." });
-  patchStage("stage2", { status: "Complete", progress: 100, copy: "Constraint bundle sealed for generation." });
-  patchStage("stage3", { status: "Approved", progress: 100, copy: "Human reviewer cleared execution packet." });
-  patchStage("stage4", { status: "Active", progress: 54, copy: "Clod routing dispatching workload to balanced tier." });
-  patchStage("stage5", { status: "Queued", progress: 22, copy: "Sandbox container primed for generated patch review." });
-  state.timeline.unshift({
-    title: "Approval Granted",
-    copy: "Operator approved the constrained prompt and released compute routing.",
-    tags: ["Stage 3", "Approved"],
-    time: "10:46 AM",
-  });
-  state.terminalLines.push({ tone: "", text: "[10:49:03.120] EXEC: Approval received. Dispatching generation request to Clod." });
-  navigate("routing");
+  await loadTask(state.task.id, { silent: true });
 }
 
-function rejectPrompt() {
-  if (state.editingPrompt) {
-    togglePromptEditing();
+async function loadTask(taskId, options = { silent: false }) {
+  try {
+    const response = await fetch(`${TASK_ENDPOINT}/${encodeURIComponent(taskId)}`);
+    if (!response.ok) {
+      throw new Error(`Task lookup failed with status ${response.status}`);
+    }
+    const task = normalizeTask(await response.json());
+    applyTask(task);
+    state.backendConnected = true;
+    connectTaskSocket(task.id);
+    localStorage.setItem(STORAGE_KEY, task.id);
+    if (!options.silent) {
+      pushStream("Task loaded", "Loaded the latest task state from the backend.", ["TASK", "LOAD"]);
+    }
+  } catch (error) {
+    state.backendConnected = false;
+    pushLog(error.message, "ERROR");
+  } finally {
+    render();
   }
-  state.approvalStatus = "rejected";
-  patchStage("stage3", { status: "Rejected", progress: 100, copy: "Execution halted pending prompt rewrite." });
-  patchStage("stage4", { status: "Blocked", progress: 0, copy: "Routing paused until revised approval." });
-  patchStage("stage5", { status: "Blocked", progress: 0, copy: "Sandbox queue released without execution." });
-  state.timeline.unshift({
-    title: "Approval Rejected",
-    copy: "Reviewer returned the system prompt for stricter escalation and rollback guidance.",
-    tags: ["Stage 3", "Blocked"],
-    time: "10:46 AM",
-  });
-  state.terminalLines.push({ tone: "alert", text: "[10:49:03.120] ABORT: Approval rejected. Sandbox execution cancelled." });
-  navigate("dashboard");
 }
 
-function bypassApproval() {
-  state.approvalStatus = "approved";
-  patchStage("stage3", { status: "Overridden", progress: 100, copy: "Quick override bypassed HITL gate for internal dry-run." });
-  patchStage("stage4", { status: "Active", progress: 46, copy: "Routing thresholds executing under operator override." });
-  patchStage("stage5", { status: "Queued", progress: 12, copy: "Sandbox refresh requested from override panel." });
-  state.timeline.unshift({
-    title: "HITL Queue Bypassed",
-    copy: "Operator bypassed manual approval for an internal dry-run environment.",
-    tags: ["Stage 3", "Override"],
-    time: "10:47 AM",
+async function submitApproval(approved) {
+  if (!state.task.id) {
+    return;
+  }
+  try {
+    const editedPrompt = els.approvalEditor.value.trim();
+    const response = await fetch(`${TASK_ENDPOINT}/${encodeURIComponent(state.task.id)}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        approved,
+        edited_prompt: approved && editedPrompt ? editedPrompt : null,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Approval request failed with status ${response.status}`);
+    }
+    const task = normalizeTask(await response.json());
+    applyTask(task);
+    pushStream(
+      approved ? "Approval granted" : "Task rejected",
+      approved ? "Phase 4 can now execute." : "The workflow was rejected before generation.",
+      ["APPROVAL"]
+    );
+    pushLog(approved ? "Approval granted" : "Task rejected", approved ? "OK" : "REVIEW");
+    setActiveView(approved ? "output" : "workflow");
+  } catch (error) {
+    pushLog(error.message, "ERROR");
+  } finally {
+    render();
+  }
+}
+
+function connectTaskSocket(taskId) {
+  if (!taskId) {
+    return;
+  }
+
+  if (state.ws) {
+    state.ws.close();
+  }
+
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  state.ws = new WebSocket(`${protocol}://${window.location.host}/ws/tasks/${taskId}`);
+
+  state.ws.addEventListener("open", () => {
+    pushLog("WS connected", "INFO");
+    renderSidebarState();
   });
+
+  state.ws.addEventListener("message", (event) => {
+    try {
+      const payload = JSON.parse(event.data);
+      handleSocketMessage(payload);
+    } catch {
+      pushLog("Failed to parse socket payload", "ERROR");
+      render();
+    }
+  });
+
+  state.ws.addEventListener("close", () => {
+    renderSidebarState();
+  });
+}
+
+function handleSocketMessage(payload) {
+  if (payload.type === "system") {
+    pushLog(payload.message, "INFO");
+  }
+
+  if (payload.type === "log") {
+    pushLog(payload.message, inferLevel(payload.message));
+    extractPrUrl(payload.message);
+  }
+
+  if (payload.type === "state_change") {
+    state.task = {
+      ...state.task,
+      current_phase: payload.phase || state.task.current_phase,
+      selected_model: payload.data?.selected_model || state.task.selected_model,
+      generated_code: payload.data?.code || state.task.generated_code,
+      updated_at: new Date().toISOString(),
+    };
+    pushStream("Phase changed", `Task advanced to ${phaseHeadline(state.task.current_phase)}.`, ["PHASE"]);
+    pushLog(`Task advanced to ${phaseHeadline(state.task.current_phase)}`, "PHASE");
+  }
+
   render();
 }
 
-function forceSandboxRefresh() {
-  state.terminalLines.push({ tone: "", text: "[10:49:44.221] INFO: Manual sandbox refresh requested by operator." });
-  state.terminalLines.push({ tone: "", text: "[10:49:44.902] INFO: Provisioning fresh recovery snapshot." });
-  state.timeline.unshift({
-    title: "Sandbox Refresh Triggered",
-    copy: "Quick override requested a fresh recovery snapshot for the active sandbox container.",
-    tags: ["Stage 5", "Refresh"],
-    time: "10:49 AM",
-  });
-  navigate("logs");
-}
-
-function cycleRange() {
-  state.rangeIndex = (state.rangeIndex + 1) % state.rangeLabels.length;
-  renderRouting();
-}
-
-async function copyRoutingCode() {
-  try {
-    await navigator.clipboard.writeText(state.routingPreview);
-  } catch {
-    // no-op fallback for preview environments
+function applyTask(task) {
+  state.task = task;
+  state.taskLookup = task.id || "";
+  state.draftPrompt = task.original_prompt || "";
+  state.draftSearchProvider = task.search_provider || "github";
+  if (!state.prUrl) {
+    state.prUrl = "";
   }
 }
 
-function toggleSecureMode() {
-  state.secureMode = !state.secureMode;
-  renderLogs();
+function normalizeTask(task) {
+  return {
+    ...EMPTY_TASK,
+    ...task,
+    bug_list_constraints: Array.isArray(task.bug_list_constraints) ? task.bug_list_constraints : [],
+    generated_code: task.generated_code || "",
+    structured_prompt: task.structured_prompt || task.original_prompt || "",
+  };
+}
+
+function copyTaskId() {
+  if (!state.task.id) {
+    return;
+  }
+  void navigator.clipboard.writeText(state.task.id);
+}
+
+function copyGeneratedCode() {
+  if (!state.task.generated_code) {
+    return;
+  }
+  void navigator.clipboard.writeText(state.task.generated_code);
+}
+
+function openPr() {
+  if (state.prUrl) {
+    window.open(state.prUrl, "_blank", "noopener,noreferrer");
+  }
+}
+
+function openDiff() {
+  if (state.prUrl) {
+    window.open(`${state.prUrl}/files`, "_blank", "noopener,noreferrer");
+  }
 }
 
 function toggleAutoRefresh() {
   state.autoRefresh = !state.autoRefresh;
-  renderLogs();
+  render();
 }
 
-function exportDashboardLog() {
-  const content = state.timeline.map((item) => `${item.time} | ${item.title}\n${item.copy}\n[${item.tags.join(", ")}]`).join("\n\n");
-  downloadFile("aegis-dashboard-log.txt", content, "text/plain");
+function toggleTailFollow() {
+  state.tailFollow = !state.tailFollow;
+  document.getElementById("toggle-tail-follow").textContent = state.tailFollow ? "Tail follow" : "Tail paused";
 }
 
-function exportRoutingReport() {
-  const range = state.rangeLabels[state.rangeIndex];
-  const report = {
-    range,
-    metrics: state.routingMetrics[range],
-    preview: state.routingPreview,
-  };
-  downloadFile("routing-report.json", JSON.stringify(report, null, 2), "application/json");
-}
-
-function exportScanReport() {
-  const report = {
-    secureMode: state.secureMode,
-    cycles: state.healingCycles,
-    terminalLines: state.terminalLines.map((line) => line.text),
-  };
-  downloadFile("sandbox-scan-report.json", JSON.stringify(report, null, 2), "application/json");
-}
-
-function tickAutoRefresh() {
-  if (!state.autoRefresh) {
-    return;
-  }
-  const pulse = [
-    "[10:49:51.104] INFO: Re-validating policy masks against latest guardrail bundle.",
-    "[10:49:54.338] INFO: Clod latency probe stable across premium region.",
-    "[10:49:58.707] INFO: TREX heartbeat acknowledged by container supervisor.",
-  ];
-  const next = pulse[Math.floor(Math.random() * pulse.length)];
-  state.terminalLines = [...state.terminalLines.slice(-15), { tone: "muted", text: next }];
-  renderLogs();
-}
-
-function promptTextFromSections() {
-  return state.promptSections
-    .map((section) => `# ${section.title}\n${section.lines.join("\n")}`)
-    .join("\n\n");
-}
-
-function parsePrompt(source) {
-  return source
-    .split(/\n(?=# )/g)
-    .map((block) => {
-      const [heading, ...lines] = block.split("\n");
-      return {
-        title: heading.replace(/^#\s*/, "").trim() || "Untitled Section",
-        lines: lines.filter(Boolean),
-      };
-    })
-    .filter((section) => section.lines.length);
-}
-
-function patchStage(stageId, patch) {
-  state.stages = state.stages.map((stage) => (stage.id === stageId ? { ...stage, ...patch } : stage));
-}
-
-function filterItems(items, pickFields) {
-  if (!state.searchQuery) {
-    return items;
-  }
-  return items.filter((item) => pickFields(item).some((field) => matchesQuery(field)));
-}
-
-function matchesQuery(value) {
-  if (!state.searchQuery) {
-    return true;
-  }
-  return String(value).toLowerCase().includes(state.searchQuery);
-}
-
-function downloadFile(name, content, type) {
-  const blob = new Blob([content], { type });
+function exportLogs() {
+  const content = state.logs.map((entry) => `[${entry.time}] ${entry.level} ${entry.message}`).join("\n");
+  const blob = new Blob([content], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = name;
+  link.download = "task-execution.log";
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function pushStream(title, copy, tags) {
+  state.stream.unshift({
+    title,
+    copy,
+    tags,
+  });
+  state.stream = state.stream.slice(0, 12);
+}
+
+function pushLog(message, level) {
+  const now = new Date();
+  state.logs.push({
+    time: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    level,
+    levelClass: level.toLowerCase(),
+    message,
+  });
+  state.logs = state.logs.slice(-200);
+}
+
+function extractPrUrl(message) {
+  const match = message.match(/https:\/\/github\.com\/[^\s]+/);
+  if (match) {
+    state.prUrl = match[0];
+  }
+}
+
+function inferLevel(message) {
+  const text = message.toLowerCase();
+  if (text.includes("error") || text.includes("fail") || text.includes("issue") || text.includes("timeout")) {
+    return "ERROR";
+  }
+  if (text.includes("review") || text.includes("approval")) {
+    return "REVIEW";
+  }
+  if (text.includes("pass") || text.includes("approved") || text.includes("merged") || text.includes("opened")) {
+    return "OK";
+  }
+  return "INFO";
+}
+
+function phaseStatus(phaseKey) {
+  if (state.task.current_phase === "FAILED") {
+    const currentIndex = phaseIndex(state.task.current_phase);
+    const phaseIndexValue = phaseIndex(phaseKey);
+    if (phaseIndexValue < currentIndex) return "DONE";
+    if (phaseIndexValue === currentIndex) return "FAILED";
+    return "BLOCKED";
+  }
+  if (state.task.current_phase === "FINISHED") {
+    return "DONE";
+  }
+  const currentIndex = phaseIndex(state.task.current_phase);
+  const phaseIndexValue = phaseIndex(phaseKey);
+  if (phaseIndexValue < currentIndex) return "DONE";
+  if (phaseIndexValue === currentIndex) return "RUNNING";
+  return "PENDING";
+}
+
+function phaseStatusClass(status) {
+  return {
+    DONE: "phase-status--done",
+    RUNNING: "phase-status--running",
+    PENDING: "phase-status--pending",
+    FAILED: "phase-status--failed",
+    BLOCKED: "phase-status--pending",
+  }[status];
+}
+
+function phaseProgress(index) {
+  const currentIndex = phaseIndex(state.task.current_phase);
+  if (state.task.current_phase === "FINISHED") return 100;
+  if (index < currentIndex) return 100;
+  if (index === currentIndex) return state.task.current_phase === "3_HUMAN_IN_THE_LOOP" ? 42 : 58;
+  return 8;
+}
+
+function phaseIndex(key) {
+  const order = PHASES.map((item) => item.key).concat(["FINISHED", "FAILED"]);
+  const index = order.indexOf(key);
+  return index === -1 ? 0 : index;
+}
+
+function phaseLatency(phaseKey) {
+  return state.phaseDurations[phaseKey] || "—";
+}
+
+function workflowPhaseLabel() {
+  if (!state.task.id) return "No active task";
+  const phase = phaseHeadline(state.task.current_phase).toUpperCase();
+  const status = state.task.current_phase === "FINISHED" ? "DONE" : state.task.current_phase === "FAILED" ? "FAILED" : "RUNNING";
+  return `${phase} · ${status}`;
+}
+
+function workflowPhaseShort() {
+  if (!state.task.id) return "No active task";
+  if (state.task.current_phase === "FINISHED") return "Finished";
+  if (state.task.current_phase === "FAILED") return "Failed";
+  return `Phase ${phaseIndex(state.task.current_phase) + 1}`;
+}
+
+function workflowPhaseCopy() {
+  return phaseDescription(state.task.current_phase);
+}
+
+function phaseDescription(phase) {
+  const descriptions = {
+    "1_INTENT_PARSING": "Request intake in progress.",
+    "2_PRECHECK_GREPTILE": "Constraint analysis in progress.",
+    "3_HUMAN_IN_THE_LOOP": "Approval waiting on reviewer input.",
+    "4_COMPUTE_ROUTING": "Code generation in flight.",
+    "5_SANDBOX_TESTING": "Sandbox review and PR flow in progress.",
+    FINISHED: "Backend marked task complete.",
+    FAILED: "Task stopped before completion.",
+  };
+  return descriptions[phase] || "Status unavailable.";
+}
+
+function phaseHeadline(phase) {
+  const labels = {
+    "1_INTENT_PARSING": "Phase 1",
+    "2_PRECHECK_GREPTILE": "Phase 2",
+    "3_HUMAN_IN_THE_LOOP": "Phase 3",
+    "4_COMPUTE_ROUTING": "Phase 4",
+    "5_SANDBOX_TESTING": "Phase 5",
+    FINISHED: "Finished",
+    FAILED: "Failed",
+  };
+  return labels[phase] || "Unknown";
+}
+
+function taskHealthLabel() {
+  if (!state.task.id) return "Idle";
+  return state.task.current_phase === "FAILED" ? "Failed" : "Healthy";
+}
+
+function healthChipClass() {
+  return state.task.current_phase === "FAILED"
+    ? "status-chip status-chip--phase"
+    : "status-chip status-chip--healthy";
+}
+
+function approvalHeaderText() {
+  if (state.task.current_phase === "FAILED") return "Rejected";
+  if (state.task.current_phase === "3_HUMAN_IN_THE_LOOP") return "Pending review";
+  if (phaseIndex(state.task.current_phase) >= phaseIndex("4_COMPUTE_ROUTING")) return "Approved";
+  return "Awaiting prompt";
+}
+
+function approvalHeaderClass() {
+  if (state.task.current_phase === "FAILED") return "status-chip status-chip--phase";
+  if (phaseIndex(state.task.current_phase) >= phaseIndex("4_COMPUTE_ROUTING")) return "status-chip status-chip--healthy";
+  return "status-chip status-chip--healthy";
+}
+
+function outputStatusLabel() {
+  if (state.task.current_phase === "FINISHED") return "Sandbox passing";
+  if (state.task.current_phase === "5_SANDBOX_TESTING") return "Sandbox running";
+  if (state.task.current_phase === "4_COMPUTE_ROUTING") return "Code generating";
+  if (state.task.current_phase === "FAILED") return "Task failed";
+  return "Waiting";
+}
+
+function outputStatusClass() {
+  return state.task.current_phase === "FAILED"
+    ? "status-chip status-chip--phase"
+    : "status-chip status-chip--healthy";
+}
+
+function outputPhaseLabel() {
+  if (state.task.current_phase === "FINISHED") return "Finished · 5/5";
+  if (state.task.current_phase === "FAILED") return "Failed";
+  return `${phaseHeadline(state.task.current_phase)} · ${Math.min(phaseIndex(state.task.current_phase) + 1, 5)}/5`;
+}
+
+function iterationProgress() {
+  if (!state.task.max_iterations) return 0;
+  return (state.task.sandbox_iterations / state.task.max_iterations) * 100;
+}
+
+function prBranchLabel() {
+  if (!state.task.id) return "Not available";
+  return `aegis-${state.task.id.slice(0, 8)}`;
+}
+
+function compactTaskId(taskId) {
+  if (!taskId) return "Not loaded";
+  if (taskId.length <= 18) return taskId;
+  return `${taskId.slice(0, 8)}...${taskId.slice(-6)}`;
+}
+
+function formatProvider(provider) {
+  return provider === "nia" ? "Nia" : "GitHub";
+}
+
+function formatTime(value) {
+  if (!value) return "Not available";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + " · just now";
+}
+
+function totalDurationLabel() {
+  const durationValues = Object.values(state.phaseDurations);
+  if (!durationValues.length) return "—";
+  return durationValues.join(" · ");
+}
+
+function phaseLogEntries() {
+  return state.logs
+    .filter((entry) => entry.level === "PHASE" || entry.level === "OK" || entry.level === "REVIEW")
+    .slice(-6)
+    .reverse();
+}
+
+function logsStatusTitle() {
+  if (!state.task.id) return "No active task";
+  if (state.task.current_phase === "FINISHED") return "Finished · 5 of 5";
+  if (state.task.current_phase === "FAILED") return "Failed";
+  return `${phaseHeadline(state.task.current_phase)} · ${Math.min(phaseIndex(state.task.current_phase) + 1, 5)} of 5`;
+}
+
+function eventMix() {
+  const last = state.logs.slice(-14);
+  const counts = { info: 0, ok: 0, review: 0, error: 0, total: last.length };
+  last.forEach((entry) => {
+    if (entry.level === "INFO" || entry.level === "PHASE") counts.info += 1;
+    else if (entry.level === "OK") counts.ok += 1;
+    else if (entry.level === "REVIEW") counts.review += 1;
+    else counts.error += 1;
+  });
+  return counts;
+}
+
+function updateMixRow(bar, count, value, total) {
+  count.textContent = String(value);
+  bar.style.width = `${total ? (value / total) * 100 : 0}%`;
+}
+
+function renderPromptDocument(source) {
+  if (!source) {
+    return `<div class="empty-state">No structured prompt available yet.</div>`;
+  }
+  const sections = source.split(/\n(?=# )/g);
+  return `
+    <div class="prompt-frame">
+      <h3>Structured System Prompt</h3>
+      ${sections.map((section) => {
+        const [heading, ...lines] = section.split("\n");
+        return `
+          <div class="prompt-section">
+            <div class="prompt-section-label">${escapeHtml(heading.replace(/^#\s*/, ""))}</div>
+            <div class="prompt-section-body">${lines.filter(Boolean).map((line) => {
+              if (line.trim().startsWith("-")) {
+                return `<div class="prompt-bullet">${escapeHtml(line.trim().replace(/^-+\s*/, ""))}</div>`;
+              }
+              return `<div>${escapeHtml(line)}</div>`;
+            }).join("")}</div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
 }
 
 function escapeHtml(value) {
@@ -772,15 +916,4 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
-}
-
-function stageIcon(type) {
-  const icons = {
-    intent: `<svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="12" r="7"></circle><path d="M12 12 15.2 9.2"></path><path d="M12 8v4l2 2"></path></svg>`,
-    shield: `<svg viewBox="0 0 24 24" class="icon"><path d="M12 3 5 6v6c0 4.6 2.9 7.8 7 9 4.1-1.2 7-4.4 7-9V6l-7-3Z"></path></svg>`,
-    document: `<svg viewBox="0 0 24 24" class="icon"><rect x="6" y="4" width="12" height="16" rx="2"></rect><path d="M9 8h6"></path><path d="M9 12h6"></path><path d="M9 16h4"></path></svg>`,
-    routing: `<svg viewBox="0 0 24 24" class="icon"><path d="M7 6h10"></path><path d="M7 12h6"></path><path d="M7 18h3"></path><circle cx="18" cy="6" r="2"></circle><circle cx="15" cy="12" r="2"></circle><circle cx="12" cy="18" r="2"></circle></svg>`,
-    clock: `<svg viewBox="0 0 24 24" class="icon"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v5l3 2"></path></svg>`,
-  };
-  return icons[type] || icons.intent;
 }
