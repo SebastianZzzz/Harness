@@ -18,5 +18,8 @@ class TaskRecord(Base):
     sandbox_iterations = Column(Integer, default=0)
     max_iterations = Column(Integer, default=3)
     error_message = Column(Text, nullable=True)
+    # BYOK: user-supplied GitHub credentials — NOT logged, NOT returned to frontend
+    github_token = Column(String, nullable=True)
+    target_repo = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

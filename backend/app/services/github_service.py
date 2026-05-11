@@ -1,4 +1,5 @@
 import os
+import re
 import base64
 import asyncio
 import httpx
@@ -6,65 +7,131 @@ from typing import Dict, Any, Optional
 
 SANDBOX_REPO = "SebastianZzzz/AegisHarness-Demo"
 BASE_URL = "https://api.github.com"
+CLOD_API_URL = "https://api.clod.io/v1/chat/completions"
 
 
-def _get_github_headers() -> Dict[str, str]:
+def _get_github_headers(token: Optional[str] = None) -> Dict[str, str]:
+    """Build GitHub API headers, using user-supplied token if provided (BYOK)."""
+    resolved_token = token or os.getenv("GITHUB_TOKEN", "")
     return {
-        "Authorization": f"Bearer {os.getenv('GITHUB_TOKEN')}",
+        "Authorization": f"Bearer {resolved_token}",
         "Accept": "application/vnd.github+json",
         "Content-Type": "application/json",
         "X-GitHub-Api-Version": "2022-11-28"
     }
 
 
+def _get_clod_headers() -> Dict[str, str]:
+    return {
+        "Authorization": f"Bearer {os.getenv('CLOD_API_KEY')}",
+        "Content-Type": "application/json"
+    }
+
+
+async def _generate_git_metadata(prompt: str) -> Dict[str, str]:
+    """
+    Use Clod to convert a natural-language prompt into:
+    - branch: e.g. "feat/image-object-detection"
+    - title:  e.g. "feat: Implement Image Object Detection CLI"
+    - commit: a concise one-liner for the commit message
+    Falls back to a sanitized slug if the Clod call fails.
+    """
+    payload = {
+        "model": "clod-unified-smart",
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a Git commit message expert. Given a natural language description of a task, "
+                    "output ONLY a JSON object with exactly three keys:\n"
+                    "  branch: a kebab-case git branch name starting with 'feat/' (max 40 chars)\n"
+                    "  title:  a PR title following Conventional Commits format (max 72 chars)\n"
+                    "  commit: a one-line commit message following Conventional Commits (max 72 chars)\n"
+                    "Return ONLY the JSON object, no markdown fences, no explanation."
+                )
+            },
+            {"role": "user", "content": f"Task: {prompt}"}
+        ]
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                CLOD_API_URL, headers=_get_clod_headers(), json=payload, timeout=30.0
+            )
+            resp.raise_for_status()
+            import json
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            # Strip markdown fences if model added them
+            raw = re.sub(r"^```[a-z]*\n?", "", raw).rstrip("`").strip()
+            meta = json.loads(raw)
+            # Sanitize branch name just in case
+            branch = re.sub(r"[^a-z0-9/_-]", "-", meta.get("branch", "feat/ai-generated").lower())
+            return {
+                "branch": branch[:50],
+                "title": meta.get("title", f"feat: {prompt[:60]}"),
+                "commit": meta.get("commit", f"feat: {prompt[:60]} (AI generated)")
+            }
+    except Exception as e:
+        print(f"GitHub: Clod metadata generation failed ({e}), using slug fallback.")
+        slug = re.sub(r"[^a-z0-9]+", "-", prompt.lower())[:35].strip("-")
+        return {
+            "branch": f"feat/{slug}",
+            "title": f"feat: {prompt[:60]}",
+            "commit": f"feat: {prompt[:60]} (AI generated)"
+        }
+
+
 class GitHubService:
 
     @staticmethod
-    async def _get_default_branch_sha(repo: str = SANDBOX_REPO) -> str:
+    async def _get_default_branch_sha(repo: str = SANDBOX_REPO, token: Optional[str] = None) -> str:
         """Get the SHA of the latest commit on the default branch."""
         async with httpx.AsyncClient() as client:
             r = await client.get(
                 f"{BASE_URL}/repos/{repo}/git/ref/heads/main",
-                headers=_get_github_headers(),
+                headers=_get_github_headers(token),
                 timeout=10.0
             )
             r.raise_for_status()
             return r.json()["object"]["sha"]
 
     @staticmethod
-    async def create_branch(branch_name: str, repo: str = SANDBOX_REPO) -> bool:
+    async def create_branch(branch_name: str, repo: str = SANDBOX_REPO,
+                            token: Optional[str] = None) -> bool:
         """Create a new branch from main."""
-        sha = await GitHubService._get_default_branch_sha(repo)
+        sha = await GitHubService._get_default_branch_sha(repo, token)
         async with httpx.AsyncClient() as client:
             r = await client.post(
                 f"{BASE_URL}/repos/{repo}/git/refs",
-                headers=_get_github_headers(),
+                headers=_get_github_headers(token),
                 json={"ref": f"refs/heads/{branch_name}", "sha": sha},
                 timeout=10.0
             )
-            # 201 = created, 422 = already exists (ok)
             print(f"GitHub: Created branch '{branch_name}' -> {r.status_code}")
             return r.status_code in (201, 422)
 
     @staticmethod
-    async def commit_code(branch_name: str, code: str, filename: str = "generated_code.py",
-                          repo: str = SANDBOX_REPO) -> bool:
-        """Commit generated code to a branch."""
+    async def commit_code(branch_name: str, code: str,
+                          filename: str = "generated_code.py",
+                          commit_message: str = "feat: AI-generated code",
+                          repo: str = SANDBOX_REPO,
+                          token: Optional[str] = None) -> str:
+        """Commit generated code to a branch and return the commit SHA."""
         encoded = base64.b64encode(code.encode("utf-8")).decode("utf-8")
 
-        # Check if file already exists (to get its SHA for update)
+        # Check if file already exists (needed to get SHA for update)
         existing_sha: Optional[str] = None
         async with httpx.AsyncClient() as client:
             check = await client.get(
                 f"{BASE_URL}/repos/{repo}/contents/{filename}?ref={branch_name}",
-                headers=_get_github_headers(),
+                headers=_get_github_headers(token),
                 timeout=10.0
             )
             if check.status_code == 200:
                 existing_sha = check.json().get("sha")
 
         payload: Dict[str, Any] = {
-            "message": f"feat(aegis): AI-generated code via AegisHarness",
+            "message": commit_message,
             "content": encoded,
             "branch": branch_name
         }
@@ -74,23 +141,28 @@ class GitHubService:
         async with httpx.AsyncClient() as client:
             r = await client.put(
                 f"{BASE_URL}/repos/{repo}/contents/{filename}",
-                headers=_get_github_headers(),
+                headers=_get_github_headers(token),
                 json=payload,
                 timeout=15.0
             )
-            print(f"GitHub: Committed code to '{branch_name}' -> {r.status_code}")
-            return r.status_code in (200, 201)
+            r.raise_for_status()
+            commit_sha = r.json()["commit"]["sha"]
+            print(f"GitHub: Committed '{filename}' to '{branch_name}' -> {commit_sha[:8]}")
+            return commit_sha
 
     @staticmethod
     async def create_pr(branch_name: str, task_id: str, prompt: str,
-                        repo: str = SANDBOX_REPO) -> int:
+                        pr_title: str = "",
+                        repo: str = SANDBOX_REPO,
+                        token: Optional[str] = None) -> int:
         """Open a Pull Request and return its number."""
+        title = pr_title or f"feat: {prompt[:60]}"
         async with httpx.AsyncClient() as client:
             r = await client.post(
                 f"{BASE_URL}/repos/{repo}/pulls",
-                headers=_get_github_headers(),
+                headers=_get_github_headers(token),
                 json={
-                    "title": f"[AegisHarness] AI-generated code — Task {task_id[:8]}",
+                    "title": title,
                     "body": (
                         f"## 🤖 AegisHarness Auto-Generated Code\n\n"
                         f"**Original intent:** {prompt}\n\n"
@@ -106,96 +178,117 @@ class GitHubService:
             r.raise_for_status()
             pr_number = r.json()["number"]
             pr_url = r.json()["html_url"]
-            print(f"GitHub: Created PR #{pr_number} -> {pr_url}")
+            print(f"GitHub: Created PR #{pr_number} '{title}' -> {pr_url}")
             return pr_number
 
     @staticmethod
-    async def wait_for_greptile_review(pr_number: int, repo: str = SANDBOX_REPO,
+    async def wait_for_greptile_review(pr_number: int, commit_sha: str,
+                                       repo: str = SANDBOX_REPO,
+                                       token: Optional[str] = None,
                                        timeout_seconds: int = 180) -> Dict[str, Any]:
         """
-        Poll the PR for Greptile's review comment.
-        Greptile posts as 'greptile-app[bot]'.
-        Returns {"passed": bool, "feedback": str, "pr_url": str}
+        Poll the PR for Greptile's review comment for a SPECIFIC commit.
         """
         pr_url = f"https://github.com/{repo}/pull/{pr_number}"
         deadline = asyncio.get_event_loop().time() + timeout_seconds
 
-        print(f"GitHub: Waiting for Greptile review on PR #{pr_number}...")
+        print(f"GitHub: Waiting for Greptile review on PR #{pr_number} for commit {commit_sha[:8]}...")
 
         while asyncio.get_event_loop().time() < deadline:
-            await asyncio.sleep(15)  # Poll every 15 seconds
+            await asyncio.sleep(15)
 
             async with httpx.AsyncClient() as client:
-                # Check PR reviews first
-                r_reviews = await client.get(
-                    f"{BASE_URL}/repos/{repo}/pulls/{pr_number}/reviews",
-                    headers=_get_github_headers(),
-                    timeout=10.0
-                )
-                if r_reviews.status_code == 200:
-                    for review in r_reviews.json():
-                        login = review.get("user", {}).get("login", "")
-                        if "greptile" in login.lower():
-                            body = review.get("body", "")
-                            state = review.get("state", "")
-                            passed = state == "APPROVED" or (
-                                "lgtm" in body.lower() or
-                                "looks good" in body.lower() or
-                                len(body.strip()) == 0
-                            )
-                            print(f"GitHub: Greptile review found! state={state}, passed={passed}")
-                            return {"passed": passed, "feedback": body, "pr_url": pr_url}
-
-                # Also check PR comments (Greptile sometimes posts as a comment)
                 r_comments = await client.get(
                     f"{BASE_URL}/repos/{repo}/issues/{pr_number}/comments",
-                    headers=_get_github_headers(),
+                    headers=_get_github_headers(token),
                     timeout=10.0
                 )
+
                 if r_comments.status_code == 200:
                     for comment in r_comments.json():
                         login = comment.get("user", {}).get("login", "")
-                        if "greptile" in login.lower():
-                            body = comment.get("body", "")
-                            passed = (
-                                "lgtm" in body.lower() or
-                                "looks good" in body.lower() or
-                                "no issues" in body.lower()
-                            )
-                            print(f"GitHub: Greptile comment found! passed={passed}")
-                            return {"passed": passed, "feedback": body, "pr_url": pr_url}
+                        if "greptile" not in login.lower():
+                            continue
+
+                        body = comment.get("body", "")
+                        
+                        # Only accept the review if it matches the commit we just pushed!
+                        if commit_sha and commit_sha not in body:
+                            continue
+
+                        # --- Parse numeric Confidence Score from Greptile's comment ---
+                        # Greptile writes "Confidence Score: N/5" in its summary
+                        score: Optional[int] = None
+                        m = re.search(r"confidence score[:\s]+([1-5])(?:[/\s]|$)",
+                                      body, re.IGNORECASE)
+                        if m:
+                            score = int(m.group(1))
+
+                        # --- Three-tier decision ---
+                        # Score 1-3 → failed (retry with Clod)
+                        # Score 4   → passed with warning (notify user)
+                        # Score 5   → perfect
+                        # None      → ambiguous, treat as passed to avoid infinite loop
+                        if score is not None:
+                            passed = score >= 4
+                            needs_warning = score == 4
+                        else:
+                            # No score found: fall back to keyword check
+                            failed_kw = any(kw in body.lower() for kw in [
+                                "not safe to merge", "p0 blocker", "p0 bug"
+                            ])
+                            passed = not failed_kw
+                            needs_warning = False
+
+                        print(f"GitHub: Greptile review — score={score}, passed={passed}, needs_warning={needs_warning}")
+                        return {
+                            "confidence_score": score,
+                            "passed": passed,
+                            "needs_warning": needs_warning,
+                            "feedback": body,
+                            "pr_url": pr_url
+                        }
 
             print(f"GitHub: Greptile not reviewed yet, waiting...")
 
         print(f"GitHub: Timeout waiting for Greptile review on PR #{pr_number}.")
-        # Timeout = treat as passed (don't block forever)
         return {
+            "confidence_score": None,
             "passed": True,
+            "needs_warning": False,
             "feedback": "Greptile review timed out — proceeding.",
             "pr_url": pr_url
         }
 
     @staticmethod
-    async def close_pr(pr_number: int, repo: str = SANDBOX_REPO):
-        """Close the PR after sandbox testing."""
+    async def close_pr(pr_number: int, repo: str = SANDBOX_REPO,
+                       token: Optional[str] = None):
+        """Close the PR after a failed sandbox iteration."""
         async with httpx.AsyncClient() as client:
             await client.patch(
                 f"{BASE_URL}/repos/{repo}/pulls/{pr_number}",
-                headers=_get_github_headers(),
+                headers=_get_github_headers(token),
                 json={"state": "closed"},
                 timeout=10.0
             )
 
     @staticmethod
-    async def merge_pr(pr_number: int, repo: str = SANDBOX_REPO) -> bool:
-        """Merge the PR into main after Greptile approval."""
+    async def merge_pr(pr_number: int, commit_title: str = "",
+                       prompt: str = "",
+                       repo: str = SANDBOX_REPO,
+                       token: Optional[str] = None) -> bool:
+        """Squash-merge the PR into main after Greptile approval."""
+        title = commit_title or f"feat: {prompt[:60]} (auto-merged by AegisHarness)"
         async with httpx.AsyncClient() as client:
             r = await client.put(
                 f"{BASE_URL}/repos/{repo}/pulls/{pr_number}/merge",
-                headers=_get_github_headers(),
+                headers=_get_github_headers(token),
                 json={
-                    "commit_title": f"feat(aegis): merge AI-generated code (PR #{pr_number})",
-                    "commit_message": "Auto-merged by AegisHarness after Greptile sandbox review passed.",
+                    "commit_title": title,
+                    "commit_message": (
+                        f"Auto-merged by AegisHarness after Greptile sandbox review passed.\n\n"
+                        f"Original intent: {prompt}"
+                    ),
                     "merge_method": "squash"
                 },
                 timeout=15.0
@@ -205,36 +298,58 @@ class GitHubService:
             return merged
 
     @staticmethod
-    async def run_sandbox(task_id: str, prompt: str, code: str) -> Dict[str, Any]:
+    async def run_sandbox(task_id: str, prompt: str, code: str,
+                          branch_name: str,
+                          pr_title: str,
+                          commit_message: str,
+                          github_token: Optional[str] = None,
+                          target_repo: Optional[str] = None) -> Dict[str, Any]:
         """
         Full Phase 5 flow:
-        1. Create branch & commit generated code
-        2. Open PR
-        3. Wait for Greptile review
-        4. If passed → merge to main (final delivery!)
-        5. Return result
+        1. Create branch (or reuse) & commit generated code
+        2. Open NEW PR for the branch
+        3. Wait for Greptile review on the exact commit
+        4. If passed → squash merge to main; else → close PR
         """
-        branch_name = f"aegis-{task_id[:8]}"
+        repo = target_repo or SANDBOX_REPO
+        token = github_token or None  # will fall back to env inside _get_github_headers
+        filename = f"src/task_{task_id[:8]}.py"
+
+        print(f"GitHub: Using branch='{branch_name}', repo='{repo}'")
 
         try:
-            await GitHubService.create_branch(branch_name)
+            await GitHubService.create_branch(branch_name, repo=repo, token=token)
+            commit_sha = await GitHubService.commit_code(
+                branch_name, code,
+                filename=filename,
+                commit_message=commit_message,
+                repo=repo, token=token
+            )
             
-            # 使用独立的源文件存放代码，让 PR 更真实且不会单纯覆盖
-            filename = f"src/task_{task_id[:8]}.py"
-            await GitHubService.commit_code(branch_name, code, filename=filename)
-            
-            pr_number = await GitHubService.create_pr(branch_name, task_id, prompt)
-            result = await GitHubService.wait_for_greptile_review(pr_number)
+            pr_number = await GitHubService.create_pr(
+                branch_name, task_id, prompt,
+                pr_title=pr_title,
+                repo=repo, token=token
+            )
+                
+            result = await GitHubService.wait_for_greptile_review(
+                pr_number, commit_sha=commit_sha, repo=repo, token=token
+            )
             result["pr_number"] = pr_number
 
             if result["passed"]:
-                merged = await GitHubService.merge_pr(pr_number)
+                merged = await GitHubService.merge_pr(
+                    pr_number,
+                    commit_title=pr_title,
+                    prompt=prompt,
+                    repo=repo, token=token
+                )
                 result["merged"] = merged
                 if merged:
                     print(f"GitHub: ✅ Code merged to main! Task {task_id[:8]} complete.")
             else:
-                # Close the PR so next iteration can open a fresh one
-                await GitHubService.close_pr(pr_number)
+                # Close PR if failed, as per user requirement, but branch remains.
+                await GitHubService.close_pr(pr_number, repo=repo, token=token)
                 result["merged"] = False
 
             return result
