@@ -15,7 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { approveTask, createTask, rejectTask } from './api';
+import { approveTask, initTask, setTaskConfig, startTask, rejectTask } from './api';
 import {
   addEvent,
   defaultRequest,
@@ -52,6 +52,8 @@ export function App() {
   const [draftPrompt, setDraftPrompt] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState('');
+  const [githubToken, setGithubToken] = useState('');
+  const [targetRepo, setTargetRepo] = useState('');
 
   const canStart = !isRunning && ['idle', 'finished', 'failed', 'rejected'].includes(state.status);
   const awaitingApproval = state.status === 'pendingApproval';
@@ -68,18 +70,35 @@ export function App() {
   const runPreApproval = async () => {
     setIsRunning(true);
     setError('');
+    
+    if (!githubToken || !targetRepo) {
+      setError('Please provide a GitHub Token and Target Repo.');
+      setIsRunning(false);
+      return;
+    }
+    
     const request = state.userRequest.trim() || defaultRequest;
     setState(
       addEvent(
-        { ...initialState, userRequest: request, status: 'context' },
+        { ...initialState, userRequest: request, status: 'idle' },
         'task.received',
-        'Task received',
-        'Backend is searching repositories and building the agent brief...',
+        'Initializing task',
+        'Setting up task and securely saving credentials...',
       ),
     );
 
     try {
-      const final = await createTask(request, (progress) => {
+      // Step 1: Init task
+      const initialTask = await initTask();
+      const taskId = initialTask.taskId!;
+      
+      // Step 2: Set config
+      await setTaskConfig(taskId, githubToken, targetRepo);
+      
+      // Step 3: Start task
+      setState((current) => addEvent(current, 'context.search.completed', 'Task started', 'Backend is searching repositories and building the agent brief...'));
+      
+      const final = await startTask(taskId, request, (progress) => {
         // Live update as the task moves through phases
         setState((current) => ({
           ...progress,
@@ -225,6 +244,28 @@ export function App() {
               disabled={isRunning || awaitingApproval}
               aria-label="Task request"
             />
+            <div className="panel-title" style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+              <ShieldCheck size={18} />
+              GitHub Config (BYOK)
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
+              <input
+                type="password"
+                placeholder="GitHub Token (e.g. ghp_...)"
+                value={githubToken}
+                onChange={(e) => setGithubToken(e.target.value)}
+                disabled={isRunning || awaitingApproval}
+                style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-inset)', color: 'var(--fg-base)' }}
+              />
+              <input
+                type="text"
+                placeholder="Target Repo (e.g. owner/repo)"
+                value={targetRepo}
+                onChange={(e) => setTargetRepo(e.target.value)}
+                disabled={isRunning || awaitingApproval}
+                style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-inset)', color: 'var(--fg-base)' }}
+              />
+            </div>
             <button className="primary-action" onClick={runPreApproval} disabled={!canStart}>
               <Sparkles size={18} />
               Build Agent Brief

@@ -41,7 +41,7 @@ class ApprovalRequest(BaseModel):
     edited_prompt: Optional[str] = None
 
 class TaskCreateRequest(BaseModel):
-    request: str
+    request: Optional[str] = None
     search_provider: SearchProvider = SearchProvider.GITHUB
 
 class StartRequest(BaseModel):

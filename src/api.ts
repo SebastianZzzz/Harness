@@ -22,11 +22,13 @@ type BackendTask = {
 
 // Map backend phase strings → frontend WorkflowStatus tokens
 const phaseMap: Record<string, WorkflowStatus> = {
+  '0_INIT':              'idle',
   '1_INTENT_PARSING':    'context',
   '2_PRECHECK_GREPTILE': 'risk',
   '3_HUMAN_IN_THE_LOOP': 'pendingApproval',
   '4_COMPUTE_ROUTING':   'execution',
   '5_SANDBOX_TESTING':   'sandbox',
+  '6_REWRITING':         'repair',
   FINISHED:              'finished',
   FAILED:                'failed',
 };
@@ -109,15 +111,39 @@ const getJson = async <T>(path: string): Promise<T> => {
 };
 
 /**
- * Create a task (returns immediately in PHASE_1 while AI runs in background).
- * Then poll until the phase advances to PHASE_3_HITL (pendingApproval) or FAILED.
+ * Step 1: Initialize an empty task
  */
-export const createTask = async (
+export const initTask = async (): Promise<WorkflowState> => {
+  const task = await postJson<BackendTask>('/api/v1/tasks/', {});
+  return normalizeTask(task);
+};
+
+/**
+ * Step 2: Set BYOK config (GitHub Token & Repo)
+ */
+export const setTaskConfig = async (
+  taskId: string,
+  githubToken: string,
+  targetRepo: string
+): Promise<void> => {
+  await postJson(`/api/v1/tasks/${taskId}/config`, {
+    github_token: githubToken,
+    target_repo: targetRepo,
+  });
+};
+
+/**
+ * Step 3: Start the task (Phase 1 intent parsing)
+ */
+export const startTask = async (
+  taskId: string,
   request: string,
   onProgress: (state: WorkflowState) => void,
 ): Promise<WorkflowState> => {
-  // POST — returns instantly with PHASE_1 task
-  const task = await postJson<BackendTask>('/api/v1/tasks/', { request });
+  const task = await postJson<BackendTask>(`/api/v1/tasks/${taskId}/start`, {
+    prompt: request,
+    search_provider: 'github'
+  });
   let state = normalizeTask(task);
   onProgress(state);
 
@@ -126,7 +152,7 @@ export const createTask = async (
   for (let i = 0; i < 120; i++) {
     await new Promise((r) => setTimeout(r, 3000)); // poll every 3s
     try {
-      const updated = await getJson<BackendTask>(`/api/v1/tasks/${task.id}`);
+      const updated = await getJson<BackendTask>(`/api/v1/tasks/${taskId}`);
       state = normalizeTask(updated);
       onProgress(state);
       if (terminalPhases.has(state.status)) return state;
