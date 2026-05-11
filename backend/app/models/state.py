@@ -28,6 +28,7 @@ class CodeTask(BaseModel):
     generated_code: Optional[str] = None
     sandbox_iterations: int = 0
     max_iterations: int = 3
+    error_message: Optional[str] = None
     created_at: datetime = datetime.utcnow()
     updated_at: datetime = datetime.utcnow()
 

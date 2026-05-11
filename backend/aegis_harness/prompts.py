@@ -46,6 +46,7 @@ Transform the user's request into a narrow, reviewable code change. Do not infer
 """
 
 
+# This is written by Yaolong
 def rewrite_request(request: str, references: list[ReferenceRepo]) -> str:
     reference_lines = "\n".join(
         f"- {repo.name} ({repo.stars}): {repo.signal}" for repo in references

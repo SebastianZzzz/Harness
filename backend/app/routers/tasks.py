@@ -43,14 +43,15 @@ def record_to_pydantic(record: TaskRecord) -> CodeTask:
     )
 
 @router.post("/", response_model=CodeTask)
-async def create_task(task_req: TaskCreateRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+async def create_task(body: TaskCreateRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """
     Phase 1: Intent Parsing & Context.
+    Body: { "request": "...", "search_provider": "github"|"nia" }
     """
+    prompt = body.request
+    search_provider = body.search_provider
     task_id = str(uuid.uuid4())
-    prompt = task_req.request
-    search_provider = task_req.search_provider
-    
+
     # Phase 1: Use selected provider to find similar repos
     similar_repos = await TryniaService.search_similar_repos(prompt, provider=search_provider.value)
     structured_prompt = await TryniaService.generate_structured_prompt(prompt, similar_repos)
@@ -102,43 +103,31 @@ async def get_task(task_id: str, db: AsyncSession = Depends(get_db)):
 @router.post("/{task_id}/approve", response_model=CodeTask)
 async def approve_task(task_id: str, approval: ApprovalRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """
-    Phase 3: HITL Checkpoint — approve or reject.
-    Can also be called with approved=False to reject from any phase.
+    Phase 3: HITL Checkpoint Approval
     """
     record = await get_task_by_id(db, task_id)
     if not record:
         raise HTTPException(status_code=404, detail="Task not found")
-
+        
+    if record.current_phase != TaskPhase.PHASE_3_HITL.value:
+        raise HTTPException(status_code=400, detail="Task is not pending approval")
+        
     if not approval.approved:
         record.current_phase = TaskPhase.FAILED.value
         await db.commit()
         await manager.broadcast_state_change(task_id, record.current_phase)
         return record_to_pydantic(record)
-
-    if record.current_phase != TaskPhase.PHASE_3_HITL.value:
-        raise HTTPException(status_code=400, detail=f"Task is not pending approval (current phase: {record.current_phase})")
-
+        
     if approval.edited_prompt:
         record.structured_prompt = approval.edited_prompt
-
+        
     record.current_phase = TaskPhase.PHASE_4_COMPUTE.value
     await db.commit()
-
+    
     await manager.broadcast_state_change(task_id, record.current_phase)
-
+    
     # Trigger Phase 4 asynchronously
     background_tasks.add_task(trigger_phase_4_bg, task_id)
-    return record_to_pydantic(record)
-
-@router.post("/{task_id}/reject", response_model=CodeTask)
-async def reject_task(task_id: str, db: AsyncSession = Depends(get_db)):
-    """Reject a task from any phase and mark as FAILED."""
-    record = await get_task_by_id(db, task_id)
-    if not record:
-        raise HTTPException(status_code=404, detail="Task not found")
-    record.current_phase = TaskPhase.FAILED.value
-    await db.commit()
-    await manager.broadcast_state_change(task_id, record.current_phase)
     return record_to_pydantic(record)
 
 async def trigger_phase_4_bg(task_id: str):
@@ -152,15 +141,23 @@ async def trigger_phase_4(db: AsyncSession, task_id: str):
     record = await get_task_by_id(db, task_id)
     if not record: return
     
-    await manager.broadcast_log(task_id, "Entering Phase 4: Routing to Clod.io for code generation...")
-    
-    # Phase 4: Use Clod.io for unified smart routing and code generation
+    await manager.broadcast_log(task_id, "Entering Phase 4: Routing to Clod.io for code generation (Gemini fallback enabled)...")
+
     prompt_to_execute = record.structured_prompt or record.original_prompt
-    model_name, generated_code = await ClodService.evaluate_and_generate(
-        prompt=prompt_to_execute, 
-        constraints=record.bug_list_constraints
-    )
-    
+    try:
+        model_name, generated_code = await ClodService.evaluate_and_generate(
+            prompt=prompt_to_execute,
+            constraints=record.bug_list_constraints,
+        )
+    except RuntimeError as exc:
+        error_msg = str(exc)
+        print(f"[Phase 4] Both providers failed: {error_msg}")
+        await manager.broadcast_log(task_id, f"Phase 4 failed: {error_msg}")
+        record.current_phase = TaskPhase.FAILED.value
+        await db.commit()
+        await manager.broadcast_state_change(task_id, record.current_phase)
+        return
+
     record.selected_model = model_name
     record.generated_code = generated_code
     record.current_phase = TaskPhase.PHASE_5_SANDBOX.value

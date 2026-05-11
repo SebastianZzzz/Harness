@@ -74,14 +74,32 @@ export function App() {
         { ...initialState, userRequest: request, status: 'context' },
         'task.received',
         'Task received',
-        'Calling the local backend, which uses the Clod API key from .env.',
+        'Backend is searching repositories and building the agent brief...',
       ),
     );
 
     try {
-      const created = await createTask(request);
-      setDraftPrompt(created.prompt);
-      setState(created);
+      const final = await createTask(request, (progress) => {
+        // Live update as the task moves through phases
+        setState((current) => ({
+          ...progress,
+          userRequest: request,
+          events: current.events, // preserve existing events
+        }));
+        setDraftPrompt(progress.prompt || '');
+        if (progress.status === 'failed' && progress.errorMessage) {
+          setError(progress.errorMessage);
+        }
+      });
+      setDraftPrompt(final.prompt || '');
+      setState((current) => ({
+        ...final,
+        userRequest: request,
+        events: current.events,
+      }));
+      if (final.status === 'failed' && final.errorMessage) {
+        setError(final.errorMessage);
+      }
     } catch (apiError) {
       const message = apiError instanceof Error ? apiError.message : 'Unknown backend error';
       setError(message);
@@ -115,8 +133,22 @@ export function App() {
     );
 
     try {
-      const approved = await approveTask(state.taskId, draftPrompt);
-      setState(approved);
+      const approved = await approveTask(state.taskId, draftPrompt, (progress) => {
+        setState((current) => ({
+          ...progress,
+          events: current.events,
+        }));
+        if (progress.status === 'failed' && progress.errorMessage) {
+          setError(progress.errorMessage);
+        }
+      });
+      setState((current) => ({
+        ...approved,
+        events: current.events,
+      }));
+      if (approved.status === 'failed' && approved.errorMessage) {
+        setError(approved.errorMessage);
+      }
     } catch (apiError) {
       const message = apiError instanceof Error ? apiError.message : 'Unknown backend error';
       setError(message);
@@ -138,7 +170,11 @@ export function App() {
     setIsRunning(true);
     setError('');
     try {
-      setState(await rejectTask(state.taskId));
+      const rejected = await rejectTask(state.taskId);
+      setState((current) => ({
+        ...rejected,
+        events: current.events,
+      }));
     } catch (apiError) {
       const message = apiError instanceof Error ? apiError.message : 'Unknown backend error';
       setError(message);
@@ -241,7 +277,12 @@ export function App() {
             </div>
             <textarea
               className="brief-editor"
-              value={draftPrompt || state.prompt || 'Run intake to generate the agent-ready Markdown brief.'}
+              value={
+                draftPrompt || state.prompt ||
+                (isRunning && ['context', 'risk'].includes(state.status)
+                  ? '⏳ AI is searching repositories and building the structured brief...\n\nThis takes 20–60 seconds. The brief will appear here automatically.'
+                  : 'Run intake to generate the agent-ready Markdown brief.')
+              }
               onChange={(event) => setDraftPrompt(event.target.value)}
               disabled={!awaitingApproval && state.status !== 'clarification'}
               aria-label="Expanded Markdown brief"

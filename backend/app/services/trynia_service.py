@@ -223,6 +223,7 @@ class TryniaService:
             print(f"Repo search error ({provider}): {e}. Falling back to defaults.")
             return ["tiangolo/fastapi", "pallets/flask", "encode/starlette"]
 
+    # This is written by Yaolong
     @staticmethod
     async def generate_structured_prompt(prompt: str, repos: List[str]) -> str:
         """Phase 1: Rewrite the prompt into a detailed engineering spec using Gemini (Clod fallback)."""

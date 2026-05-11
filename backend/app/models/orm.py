@@ -17,5 +17,6 @@ class TaskRecord(Base):
     generated_code = Column(Text, nullable=True)
     sandbox_iterations = Column(Integer, default=0)
     max_iterations = Column(Integer, default=3)
+    error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
