@@ -7,6 +7,9 @@ import {
   fetchHealth,
   loadTask,
   rejectTask,
+  listTasks,
+  deleteTask,
+  restartSystem,
   type BackendTask,
 } from "./api";
 
@@ -35,6 +38,8 @@ type PhaseMeta = {
 };
 
 const STORAGE_KEY = "aegis.task.id";
+const GITHUB_TOKEN_KEY = "aegis.github.token";
+const TARGET_REPO_KEY = "aegis.target.repo";
 const TARGET_REPO = "Harness";
 
 const PHASES: PhaseMeta[] = [
@@ -144,6 +149,14 @@ function CopyIcon() {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+
 function PlusIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -192,23 +205,29 @@ function App() {
   const [request, setRequest] = useState("");
   const [searchProvider, setSearchProvider] = useState("github");
   const [githubToken, setGithubToken] = useState("");
-  const [targetRepo, setTargetRepo] = useState("SebastianZzzz/AegisHarness-Demo");
+  const [targetRepo, setTargetRepo] = useState("");
   const [taskInput, setTaskInput] = useState("");
   const [backendConnected, setBackendConnected] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [tailFollow, setTailFollow] = useState(true);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [history, setHistory] = useState<BackendTask[]>([]);
   const [prUrl, setPrUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const terminalRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     void refreshHealth();
+    void fetchHistory();
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       setTaskInput(stored);
       void handleLoadTask(stored, true);
     }
+    const storedToken = localStorage.getItem(GITHUB_TOKEN_KEY);
+    if (storedToken) setGithubToken(storedToken);
+    const storedRepo = localStorage.getItem(TARGET_REPO_KEY);
+    if (storedRepo) setTargetRepo(storedRepo);
   }, []);
 
   useEffect(() => {
@@ -340,6 +359,31 @@ function App() {
       pushLog("ERR", error instanceof Error ? error.message : "Task creation failed");
     } finally {
       setLoading(false);
+      void fetchHistory();
+    }
+  }
+
+  async function fetchHistory() {
+    try {
+      const tasks = await listTasks();
+      setHistory(tasks.slice(0, 15)); // Only show last 15
+    } catch {
+      // silent
+    }
+  }
+
+  async function handleDeleteTask(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!window.confirm("Delete this task from history?")) return;
+    try {
+      await deleteTask(id);
+      if (task.id === id) {
+        setTask(EMPTY_TASK);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      void fetchHistory();
+    } catch (err) {
+      alert("Failed to delete task.");
     }
   }
 
@@ -360,6 +404,18 @@ function App() {
     } catch (error) {
       pushLog("ERR", error instanceof Error ? error.message : "Task load failed");
     }
+  }
+
+  function handleNewTask() {
+    if (task.id && !window.confirm("Start a new task? Any unsaved changes will be lost.")) return;
+    setTask(EMPTY_TASK);
+    setTaskInput("");
+    setRequest("");
+    setLogs([]);
+    setPrUrl("");
+    localStorage.removeItem(STORAGE_KEY);
+    setView("workflow");
+    pushLog("INFO", "Ready for a new task");
   }
 
   async function handleApprove() {
@@ -431,6 +487,26 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
+  async function handleRestartSystem() {
+    if (!window.confirm("Are you sure you want to RESTART the backend process? \n\nThis will terminate current workers, clear local cache, and reload the server.")) {
+      return;
+    }
+    try {
+      pushLog("REVIEW", "🔄 Sending restart command and WIPING ALL DATA...");
+      // Total Wipe: Clear everything from local storage
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(GITHUB_TOKEN_KEY);
+      localStorage.removeItem(TARGET_REPO_KEY);
+      
+      await restartSystem();
+      pushLog("OK", "Signal sent. Waiting for reload...");
+      // Refresh after a delay to wait for reload
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      pushLog("ERR", "Restart signal failed to reach backend.");
+    }
+  }
+
   return (
     <main className="browser">
       <aside className="sidebar">
@@ -449,6 +525,21 @@ function App() {
           <button className={`nav-item${view === "output" ? " active" : ""}`} onClick={() => setView("output")}><SlidersIcon /><span>Output</span></button>
           <button className={`nav-item${view === "logs" ? " active" : ""}`} onClick={() => setView("logs")}><LogsIcon /><span>Logs</span><span className="badge">{task.id ? "live" : "idle"}</span></button>
         </div>
+
+        <div className="nav-group history-group">
+          <div className="nav-label">History</div>
+          <div className="history-list">
+            {history.length > 0 ? history.map((item) => (
+              <div key={item.id} className={`history-item ${task.id === item.id ? "active" : ""}`} onClick={() => void handleLoadTask(item.id)}>
+                <div className="history-info">
+                  <div className="history-prompt">{item.original_prompt || "Untitled Task"}</div>
+                  <div className="history-meta">{compactTaskId(item.id)} · {new Date(item.created_at).toLocaleDateString()}</div>
+                </div>
+                <button className="history-del" onClick={(e) => void handleDeleteTask(item.id, e)} title="Delete task"><TrashIcon /></button>
+              </div>
+            )) : <div className="helper" style={{ padding: "0 12px" }}>No previous tasks.</div>}
+          </div>
+        </div>
       </aside>
 
       <div className="main">
@@ -459,7 +550,8 @@ function App() {
             <button className="pill-copy" onClick={copyTaskId}><CopyIcon /></button>
           </div>
           <button className="btn" onClick={() => void handleLoadTask(task.id || taskInput, true)}><RefreshIcon /> Refresh</button>
-          <button className="btn" onClick={() => void handleLoadTask()}><PlusIcon /> Load task</button>
+          <button className="btn danger" onClick={handleRestartSystem}><RefreshIcon /> Restart system</button>
+          <button className="btn primary" onClick={handleNewTask}><PlusIcon /> New task</button>
           <div className="spacer" />
           <div className="live-chip"><span className="dot" style={{ background: backendConnected ? "var(--ok)" : "var(--danger)" }} /> {backendConnected ? "Backend connected" : "Backend unavailable"}</div>
         </div>
@@ -499,12 +591,18 @@ function App() {
                     </div>
                     <div className="field">
                       <span className="field-label">GitHub Token</span>
-                      <input className="input" type="password" placeholder="ghp_..." value={githubToken} onChange={(event) => setGithubToken(event.target.value)} />
+                      <input className="input" type="password" placeholder="ghp_..." value={githubToken} onChange={(event) => {
+                        setGithubToken(event.target.value);
+                        localStorage.setItem(GITHUB_TOKEN_KEY, event.target.value);
+                      }} />
                     </div>
                   </div>
                   <div className="field">
                     <span className="field-label">Target repository</span>
-                    <input className="input" value={targetRepo} onChange={(event) => setTargetRepo(event.target.value)} />
+                    <input className="input" value={targetRepo} onChange={(event) => {
+                      setTargetRepo(event.target.value);
+                      localStorage.setItem(TARGET_REPO_KEY, event.target.value);
+                    }} />
                   </div>
                   <div className="row-between">
                     <div className="hgap-8">

@@ -97,3 +97,16 @@ export async function rejectTask(taskId: string): Promise<BackendTask> {
   });
   return parseJson<BackendTask>(response);
 }
+
+export async function listTasks(): Promise<BackendTask[]> {
+  const response = await fetch("/api/v1/tasks/");
+  return parseJson<BackendTask[]>(response);
+}
+
+export async function deleteTask(taskId: string): Promise<void> {
+  await fetch(`/api/v1/tasks/${encodeURIComponent(taskId)}`, { method: "DELETE" });
+}
+
+export async function restartSystem(): Promise<void> {
+  await fetch("/api/v1/system/restart", { method: "POST" });
+}

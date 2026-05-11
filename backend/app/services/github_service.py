@@ -198,54 +198,70 @@ class GitHubService:
             await asyncio.sleep(15)
 
             async with httpx.AsyncClient() as client:
-                r_comments = await client.get(
+                # 1. Fetch top-level Issue Comments (Summary, Flowchart)
+                r_issue_comments = await client.get(
                     f"{BASE_URL}/repos/{repo}/issues/{pr_number}/comments",
                     headers=_get_github_headers(token),
                     timeout=10.0
                 )
 
-                if r_comments.status_code == 200:
-                    for comment in r_comments.json():
+                # 2. Fetch Line-level Review Comments (Exact fixes)
+                r_review_comments = await client.get(
+                    f"{BASE_URL}/repos/{repo}/pulls/{pr_number}/comments",
+                    headers=_get_github_headers(token),
+                    timeout=10.0
+                )
+
+                if r_issue_comments.status_code == 200:
+                    summary_comment = ""
+                    for comment in r_issue_comments.json():
                         login = comment.get("user", {}).get("login", "")
                         if "greptile" not in login.lower():
                             continue
-
                         body = comment.get("body", "")
-                        
-                        # Only accept the review if it matches the commit we just pushed!
                         if commit_sha and commit_sha not in body:
                             continue
+                        summary_comment = body
+                        break
+                    
+                    if summary_comment:
+                        # Fetch all detailed line comments from Greptile
+                        detail_comments = []
+                        if r_review_comments.status_code == 200:
+                            for c in r_review_comments.json():
+                                if "greptile" in c.get("user", {}).get("login", "").lower():
+                                    path = c.get("path", "")
+                                    line = c.get("line") or c.get("original_line", "unknown")
+                                    body = c.get("body", "")
+                                    detail_comments.append(f"[{path} L{line}]: {body}")
+                        
+                        full_feedback = summary_comment
+                        if detail_comments:
+                            full_feedback += "\n\n### Detailed Line-by-Line Feedback:\n" + "\n".join(detail_comments)
 
-                        # --- Parse numeric Confidence Score from Greptile's comment ---
-                        # Greptile writes "Confidence Score: N/5" in its summary
+                        # --- Parse numeric Confidence Score ---
                         score: Optional[int] = None
                         m = re.search(r"confidence score[:\s]+([1-5])(?:[/\s]|$)",
-                                      body, re.IGNORECASE)
+                                      summary_comment, re.IGNORECASE)
                         if m:
                             score = int(m.group(1))
 
-                        # --- Three-tier decision ---
-                        # Score 1-3 → failed (retry with Clod)
-                        # Score 4   → passed with warning (notify user)
-                        # Score 5   → perfect
-                        # None      → ambiguous, treat as passed to avoid infinite loop
                         if score is not None:
                             passed = score >= 4
                             needs_warning = score == 4
                         else:
-                            # No score found: fall back to keyword check
-                            failed_kw = any(kw in body.lower() for kw in [
+                            failed_kw = any(kw in summary_comment.lower() for kw in [
                                 "not safe to merge", "p0 blocker", "p0 bug"
                             ])
                             passed = not failed_kw
                             needs_warning = False
 
-                        print(f"GitHub: Greptile review — score={score}, passed={passed}, needs_warning={needs_warning}")
+                        print(f"GitHub: Greptile review — score={score}, passed={passed}, details={len(detail_comments)}")
                         return {
                             "confidence_score": score,
                             "passed": passed,
                             "needs_warning": needs_warning,
-                            "feedback": body,
+                            "feedback": full_feedback,
                             "pr_url": pr_url
                         }
 

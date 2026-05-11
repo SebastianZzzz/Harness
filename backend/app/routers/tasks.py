@@ -17,8 +17,11 @@ from app.routers.websocket import manager
 
 router = APIRouter()
 
-# Demo Target Repository for Greptile Sandbox
-TARGET_REPO = "sebastianZzzz/Harness"
+# Demo Target Repository for Greptile Sandbox (Placeholder)
+TARGET_REPO = "your-org/your-repo"
+
+# Global set to track currently running background task IDs
+ACTIVE_TASKS = set()
 
 async def get_task_by_id(db: AsyncSession, task_id: str) -> TaskRecord:
     result = await db.execute(select(TaskRecord).where(TaskRecord.id == task_id))
@@ -106,6 +109,19 @@ async def create_task(background_tasks: BackgroundTasks, body: Optional[TaskCrea
     background_tasks.add_task(trigger_phase_2_bg, task_id, similar_repos)
     return record_to_pydantic(new_record)
 
+async def trigger_phase_1_2_bg(task_id: str):
+    """Resume Phase 1/2 from start if needed."""
+    if task_id in ACTIVE_TASKS: return
+    ACTIVE_TASKS.add(task_id)
+    try:
+        async with AsyncSessionLocal() as db:
+            record = await get_task_by_id(db, task_id)
+            if not record or not record.original_prompt: return
+            similar_repos = await TryniaService.search_similar_repos(record.original_prompt, provider=record.search_provider)
+            await trigger_phase_2(db, task_id, similar_repos)
+    finally:
+        ACTIVE_TASKS.discard(task_id)
+
 @router.post("/{task_id}/start", response_model=CodeTask)
 async def start_task(task_id: str, req: StartRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """
@@ -138,8 +154,13 @@ async def start_task(task_id: str, req: StartRequest, background_tasks: Backgrou
     return record_to_pydantic(record)
 
 async def trigger_phase_2_bg(task_id: str, similar_repos: list[str]):
-    async with AsyncSessionLocal() as db:
-        await trigger_phase_2(db, task_id, similar_repos)
+    if task_id in ACTIVE_TASKS: return
+    ACTIVE_TASKS.add(task_id)
+    try:
+        async with AsyncSessionLocal() as db:
+            await trigger_phase_2(db, task_id, similar_repos)
+    finally:
+        ACTIVE_TASKS.discard(task_id)
 
 async def trigger_phase_2(db: AsyncSession, task_id: str, similar_repos: list[str]):
     """
@@ -159,11 +180,48 @@ async def trigger_phase_2(db: AsyncSession, task_id: str, similar_repos: list[st
     
     await manager.broadcast_state_change(task_id, record.current_phase)
 
-@router.get("/{task_id}", response_model=CodeTask)
-async def get_task(task_id: str, db: AsyncSession = Depends(get_db)):
+@router.get("/", response_model=list[CodeTask])
+async def list_tasks(db: AsyncSession = Depends(get_db)):
+    """List all tasks in descending order of creation."""
+    result = await db.execute(select(TaskRecord).order_by(TaskRecord.created_at.desc()))
+    records = result.scalars().all()
+    return [record_to_pydantic(r) for r in records]
+
+@router.delete("/{task_id}")
+async def delete_task(task_id: str, db: AsyncSession = Depends(get_db)):
+    """Remove a task from the database."""
     record = await get_task_by_id(db, task_id)
     if not record:
         raise HTTPException(status_code=404, detail="Task not found")
+    await db.delete(record)
+    await db.commit()
+    return {"status": "ok"}
+
+@router.get("/{task_id}", response_model=CodeTask)
+async def get_task(task_id: str, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+    record = await get_task_by_id(db, task_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    # AUTO-RESUME LOGIC:
+    # If the task is in a running phase but NOT in our active task pool, resume it.
+    running_phases = {
+        TaskPhase.PHASE_1_INTENT.value,
+        TaskPhase.PHASE_2_PRECHECK.value,
+        TaskPhase.PHASE_4_COMPUTE.value,
+        TaskPhase.PHASE_5_SANDBOX.value,
+        TaskPhase.PHASE_6_REWRITING.value
+    }
+    
+    if record.current_phase in running_phases and task_id not in ACTIVE_TASKS:
+        print(f"[RESUME] Task {task_id} was found in phase {record.current_phase} but not running. Resuming...")
+        if record.current_phase in {TaskPhase.PHASE_1_INTENT.value, TaskPhase.PHASE_2_PRECHECK.value}:
+            background_tasks.add_task(trigger_phase_1_2_bg, task_id)
+        elif record.current_phase == TaskPhase.PHASE_4_COMPUTE.value:
+            background_tasks.add_task(trigger_phase_4_bg, task_id)
+        elif record.current_phase in {TaskPhase.PHASE_5_SANDBOX.value, TaskPhase.PHASE_6_REWRITING.value}:
+            background_tasks.add_task(trigger_phase_5_bg, task_id)
+            
     return record_to_pydantic(record)
 
 @router.post("/{task_id}/approve", response_model=CodeTask)
@@ -197,8 +255,13 @@ async def approve_task(task_id: str, approval: ApprovalRequest, background_tasks
     return record_to_pydantic(record)
 
 async def trigger_phase_4_bg(task_id: str):
-    async with AsyncSessionLocal() as db:
-        await trigger_phase_4(db, task_id)
+    if task_id in ACTIVE_TASKS: return
+    ACTIVE_TASKS.add(task_id)
+    try:
+        async with AsyncSessionLocal() as db:
+            await trigger_phase_4(db, task_id)
+    finally:
+        ACTIVE_TASKS.discard(task_id)
 
 async def trigger_phase_4(db: AsyncSession, task_id: str):
     """
@@ -232,12 +295,16 @@ async def trigger_phase_4(db: AsyncSession, task_id: str):
     await manager.broadcast_state_change(task_id, record.current_phase, {"selected_model": model_name})
     
     # Trigger Phase 5
-    import asyncio
-    asyncio.create_task(trigger_phase_5_bg(task_id))
+    background_tasks.add_task(trigger_phase_5_bg, task_id)
 
 async def trigger_phase_5_bg(task_id: str):
-    async with AsyncSessionLocal() as db:
-        await trigger_phase_5(db, task_id)
+    if task_id in ACTIVE_TASKS: return
+    ACTIVE_TASKS.add(task_id)
+    try:
+        async with AsyncSessionLocal() as db:
+            await trigger_phase_5(db, task_id)
+    finally:
+        ACTIVE_TASKS.discard(task_id)
 
 async def trigger_phase_5(db: AsyncSession, task_id: str):
     """
@@ -317,7 +384,7 @@ async def trigger_phase_5(db: AsyncSession, task_id: str):
         # ───────────────────────────────────────────────────────────────────
 
         current_constraints = list(record.bug_list_constraints or [])
-        new_constraint = f"[Greptile iteration {record.sandbox_iterations}, score {score_label}]: {feedback[:800]}"
+        new_constraint = f"[Greptile iteration {record.sandbox_iterations}, score {score_label}]: {feedback[:3000]}"
         current_constraints.append(new_constraint)
         record.bug_list_constraints = current_constraints
 

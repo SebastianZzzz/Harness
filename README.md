@@ -2,6 +2,12 @@
 
 AegisHarness is a self-healing agentic compiler and guardrail console. It transforms natural-language intents into structured briefs, requires human approval, and tests code in a live GitHub sandbox with bot reviews.
 
+# Authors
+
+- @SebastianZzzz
+- @Yiou Li
+- @Allen (Yaolong) Hu
+
 ## Current Scope
 
 - **Frontend MVP**: Vite + React + TypeScript workflow console with BYOK (Bring-Your-Own-Key) support.

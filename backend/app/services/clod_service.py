@@ -10,6 +10,8 @@ CLOD_BASE_URL = "https://api.clod.io/v1"
 SYSTEM_PROMPT = (
     "You are AegisHarness yaolong, an expert Agentic Compiler. "
     "Output high-quality, secure code that strictly adheres to constraints. "
+    "If the constraints contain feedback with line numbers (e.g., [filename L123]), "
+    "these are EXACT fixes from a reviewer—PRIORITIZE these fixes above all else. "
     "NEVER output markdown fences, ONLY the raw python code."
 )
 

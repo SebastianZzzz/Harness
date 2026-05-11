@@ -12,6 +12,9 @@
   --accent: #1e3a5f;
   --accent-soft: #e3eaf2;
   --accent-ink: #0f2238;
+  --brand: #1e3a5f;
+  --brand-hover: #152945;
+  --brand-soft: #e3eaf2;
   --ok: #2f6b4e;
   --ok-soft: #dcebe2;
   --warn: #8a5a1b;
@@ -250,18 +253,57 @@ button {
   white-space: nowrap;
   line-height: 1.2;
   flex: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn:hover {
+  background: var(--bg-sub);
+  border-color: var(--muted-2);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0) scale(0.97);
+  background: var(--line-strong);
 }
 
 .btn svg {
   width: 13px;
   height: 13px;
+  transition: transform 0.5s ease;
 }
 
-.btn.primary {
-  background: var(--ink);
-  color: #fff;
-  border-color: var(--ink);
+/* Spin animation for refresh icons on hover */
+.btn:hover svg {
+  transform: rotate(180deg);
 }
+
+
+.btn.primary {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+
+.btn.primary:hover {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.btn.danger {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+
+.btn.danger:hover {
+  background: #b54537; /* A slightly lighter red for hover */
+  border-color: #b54537;
+  box-shadow: 0 4px 12px rgba(154, 58, 46, 0.2);
+}
+
 
 .btn:disabled {
   opacity: 0.55;
@@ -1067,3 +1109,86 @@ select.input {
     flex-wrap: wrap;
   }
 }
+
+/* History Sidebar Styles */
+.history-group {
+  margin-top: 24px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.history-item:hover {
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+.history-item.active {
+  background: var(--surface-active);
+  border-color: var(--brand-soft);
+}
+
+.history-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-prompt {
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-meta {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.history-del {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--muted);
+  opacity: 0;
+  transition: all 0.2s ease;
+  background: transparent;
+  border: none;
+}
+
+.history-item:hover .history-del {
+  opacity: 1;
+}
+
+.history-del:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
