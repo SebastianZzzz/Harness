@@ -38,7 +38,8 @@ def record_to_pydantic(record: TaskRecord) -> CodeTask:
         generated_code=record.generated_code,
         sandbox_iterations=record.sandbox_iterations,
         max_iterations=record.max_iterations,
-        target_repo=record.target_repo,  # expose repo; token is NEVER returned
+        target_repo=record.target_repo,
+        error_message=record.error_message,
         created_at=record.created_at,
         updated_at=record.updated_at
     )

@@ -1,39 +1,44 @@
 # AegisHarness
 
-AegisHarness is an agentic compiler and guardrail console for safer AI coding. It turns a natural-language request into a structured agent brief, parses real-world open-source context, pauses for human approval, and runs generated code through a real GitHub sandbox with automated bot reviews.
+AegisHarness is a self-healing agentic compiler and guardrail console. It transforms natural-language intents into structured briefs, requires human approval, and tests code in a live GitHub sandbox with bot reviews.
 
 ## Current Scope
 
-- **Frontend MVP**: Vite + React + TypeScript workflow console.
-- **Python Backend**: FastAPI + SQLAlchemy + Uvicorn with persistent task state.
-- **AI Infrastructure**: Gemini-first routing with Clod.io fallback.
+- **Frontend MVP**: Vite + React + TypeScript workflow console with BYOK (Bring-Your-Own-Key) support.
+- **Python Backend**: FastAPI + SQLAlchemy + Uvicorn with robust state machine tracking.
+- **AI Infrastructure**: Gemini-first routing with dynamic Clod.io model escalation.
 - **Real-World Context**: Integrated with GitHub Search and Greptile for repository analysis.
-- **Agentic Sandbox**: Real GitHub PR loop with automated code reviews and self-repair.
+- **Self-Healing Sandbox**: Real GitHub PR loop with automated bot reviews and context-aware repair.
 
-## Five Phases
+## The Agentic Pipeline
+
+0. **Initialization & Configuration (0_INIT)**
+   - Decoupled task creation.
+   - Securely accepts user-provided GitHub Token and Target Repo credentials (BYOK).
 
 1. **Intent Parsing & Context Building**
    - Uses **TryniaService** to find top-starred GitHub repositories matching the user's intent.
-   - AI validates repository relevance before extracting patterns.
-   - Rewrites vague requests into a detailed, structured engineering specification.
+   - AI validates repository relevance and expands requests into detailed engineering specifications.
 
 2. **Preflight Bug-List Generation**
    - Uses **GreptileService** to fetch and analyze READMEs from similar repositories.
-   - Extracts common bugs, security vulnerabilities, and anti-patterns.
-   - Appends these as negative constraints to the final agent brief.
+   - Appends extracted anti-patterns as negative constraints to the agent brief.
 
 3. **Human-in-the-Loop (HITL) Confirmation**
    - Pauses at `PENDING_APPROVAL`.
-   - Allows users to review, edit, or reject the structured brief and bug list.
+   - Allows users to review, edit, or reject the structured brief.
 
 4. **Compute Routing & Generation**
-   - Scores task difficulty (1-5) and routes to the most cost-effective model via **Clod.io**.
-   - Generates code artifacts strictly adhering to the preflight constraints.
+   - Scores task difficulty and routes to a fast, cost-effective model (e.g., `clod-unified-smart`).
+   - Generates code artifacts adhering to the preflight constraints.
 
-5. **GitHub Sandbox & GrepLoop Repair**
-   - Uses **GitHubService** to commit code to a dedicated sandbox repository.
-   - Opens a real Pull Request and waits for the **Greptile App** bot review.
-   - If the bot finds issues, the feedback is fed back into Phase 4 for regeneration (up to 3 iterations).
+5. **GitHub Sandbox Testing**
+   - Uses **GitHubService** to commit code to a user's target repository.
+   - Reuses existing PR branches and waits for real Greptile bot reviews.
+
+6. **Contextual Rewriting & Self-Repair (6_REWRITING)**
+   - If the bot finds issues, feedback and the *previous code* are fed back into the model.
+   - Dynamically escalates to the most powerful model (`clod-unified-max`) for precise bug fixing (up to 3 iterations).
 
 ## Getting Started
 

@@ -67,8 +67,10 @@ export const normalizeTask = (task: BackendTask): WorkflowState => ({
   repairAttempts: task.sandbox_iterations ?? 0,
   maxRepairAttempts: task.max_iterations ?? 3,
   review: {
-    status: 'pending',
-    summary: 'No sandbox review has run yet.',
+    status: (task.current_phase === 'FINISHED' || task.current_phase === 'FAILED') 
+             ? (task.error_message ? 'failed' : 'passed') 
+             : (task.error_message ? 'failed' : 'pending'),
+    summary: task.error_message ? task.error_message : (task.current_phase === 'FINISHED' ? 'Sandbox checks and Greptile bot review passed successfully!' : 'No sandbox review has run yet.'),
     tests: [],
   },
   events: [],
