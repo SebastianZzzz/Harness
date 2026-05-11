@@ -5,17 +5,20 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      "/api": {
-        target: "http://127.0.0.1:8000",
+      '/api': {
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+        secure: false,
       },
-      "/health": {
-        target: "http://127.0.0.1:8000",
+      '/health': {
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+        secure: false,
       },
-      "/ws": {
-        target: "ws://127.0.0.1:8000",
+      '/ws': {
+        target: 'ws://127.0.0.1:8000',
         ws: true,
+        secure: false,
       },
     },
   },
