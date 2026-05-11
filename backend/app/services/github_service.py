@@ -5,7 +5,7 @@ import asyncio
 import httpx
 from typing import Dict, Any, Optional
 
-SANDBOX_REPO = "SebastianZzzz/AegisHarness-Demo"
+SANDBOX_REPO = "SebastianZzzz/Harness"
 BASE_URL = "https://api.github.com"
 CLOD_API_URL = "https://api.clod.io/v1/chat/completions"
 
